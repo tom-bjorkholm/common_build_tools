@@ -1,0 +1,33 @@
+.gitignore.bak
+./venv
+venv/*
+dist/*
+build/*
+reports/*
+*.pyc
+.coverage*
+.mypy_cache*
+.pytest_cache*
+__pycache__
+*.egg-info
+base/dist
+base/dist/*
+base/*.pyc
+base/__pycache__
+base/*.egg-info
+extend/dist
+extend/dist/*
+extend/*.pyc
+extend/__pycache__
+extend/*.egg-info
+.DS_Store
+.cursor
+.cursor/*
+.cursorignore
+.claude
+.claude/*
+.claudeignore
+AGENTS.md
+# example/result/*.docx
+# example/result/*.odt
+example/result/.*#
