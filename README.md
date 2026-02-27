@@ -2,7 +2,7 @@
 
 This git repository is **not** intended to be used as a standalone git repo.
 
-It is usually *not* useful to `git clone` this repository.
+It is usually **not** useful to `git clone` this repository.
 
 ## Common build tools as submodule
 
