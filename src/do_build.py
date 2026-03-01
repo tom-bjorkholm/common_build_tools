@@ -34,6 +34,7 @@ from setup_build_environment import setup_build_environment
 
 REPORT_DIR_NAME = 'reports'
 DIST_DIR_NAME = 'dist'
+CUSTOM_BUILD_TOOLS_DIR_NAME = 'custom_build_tools'
 BUILD_LOG_NAME = 'build_log.txt'
 PYTEST_LOG_NAME = 'pytest_log.txt'
 PYLINT_LOG_NAME = 'pylint_log.txt'
@@ -90,13 +91,19 @@ def _run_custom_hooks(hooks: Optional[list[CustomFunction]],
         hook(build_spec, build_information)
 
 
-def _ensure_venv(python_name: Optional[str], project_root: Path) -> None:
+def _ensure_venv(python_name: Optional[str], project_root: Path,
+                 build_spec: BuildSpec,
+                 build_information: BuildInformation) -> None:
     """Create build environment if venv is missing."""
     venv_cmd = venv_python()
     venv_path = project_root / venv_cmd[0]
     if venv_path.exists():
         return
-    setup_build_environment(python_name)
+    setup_build_environment(
+        python_name=python_name,
+        build_spec=build_spec,
+        build_information=build_information
+    )
 
 
 def _clean_cache_folders(build_information: BuildInformation) -> None:
@@ -356,7 +363,8 @@ def _run_pydoc_markdown(venv_cmd: list[str], build_spec: BuildSpec,
                         build_log: Path, project_root: Path) -> int:
     """Run pydoc-markdown for all matching config files."""
     _ = venv_cmd
-    custom_folder = project_root / build_spec.custom_build_tools_folder
+    _ = build_spec
+    custom_folder = project_root / CUSTOM_BUILD_TOOLS_DIR_NAME
     if not custom_folder.is_dir():
         return 0
     (project_root / 'doc').mkdir(parents=True, exist_ok=True)
@@ -634,7 +642,12 @@ def do_build(python_name: Optional[str] = None,
         active_information = get_build_information(active_spec)
     project_root = active_information['project_root']
     _name, _python_cmd = resolve_target_python(python_name)
-    _ensure_venv(python_name=python_name, project_root=project_root)
+    _ensure_venv(
+        python_name=python_name,
+        project_root=project_root,
+        build_spec=active_spec,
+        build_information=active_information
+    )
     venv_cmd = venv_python()
     _run_custom_hooks(active_spec.custom_before_clean, active_spec,
                       active_information)

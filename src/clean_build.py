@@ -11,9 +11,9 @@ from best_installed_python import resolve_target_python
 from build_information import get_build_information
 from build_spec import BuildInformation, BuildSpec
 from build_utils import exit_if_in_virtualenv, extract_python_name
+from get_build_spec import get_build_spec
 from clean import clean
 from do_build import do_build
-from get_build_spec import get_build_spec
 from setup_build_environment import setup_build_environment
 
 
@@ -28,10 +28,13 @@ def clean_build(python_name: Optional[str] = None,
     exit_if_in_virtualenv('delete virtual environment')
     resolved_name, _cmd = resolve_target_python(python_name)
     clean(build_spec=active_spec, build_information=active_information)
-    setup_build_environment(python_name=resolved_name)
-    refreshed_information = get_build_information(active_spec)
+    setup_build_environment(
+        python_name=resolved_name,
+        build_spec=active_spec,
+        build_information=active_information
+    )
     return do_build(python_name=resolved_name, build_spec=active_spec,
-                    build_information=refreshed_information)
+                    build_information=active_information)
 
 
 if __name__ == '__main__':

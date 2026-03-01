@@ -56,7 +56,7 @@ class BuildSpec(NamedTuple):
     11. Run pytest on discovered test folders.
     12. Run `custom_after_test` hooks.
     13. Run pydoc-markdown for
-        `custom_build_tools/pydoc-markdown*.yml`.
+        `custom_build_tools/pydoc-markdown*.yml` in project root.
     14. Generate reports under `reports/` and update README summaries.
     15. Run `custom_final` hooks.
     16. Restore generated files with line-ending-only git changes.
@@ -119,9 +119,6 @@ class BuildSpec(NamedTuple):
 
     mypy_paths: Optional[list[Path]] = None
     """Additional paths to add to MYPYPATH for mypy run."""
-
-    custom_build_tools_folder: Path = Path('custom_build_tools')
-    """Folder containing project-specific build hooks and config files."""
 
     additional_venv_packages: Optional[list[str]] = None
     """Additional packages to install in the venv."""
