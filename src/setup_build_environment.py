@@ -21,7 +21,7 @@ from build_utils import (
 )
 from get_build_spec import get_build_spec
 
-GLOBAL_PACKAGES = ['pip']
+GLOBAL_PACKAGES = ['pip', 'gitpython']
 
 GLOBAL_PINNED_PACKAGES = ['twine==6.0.1']
 

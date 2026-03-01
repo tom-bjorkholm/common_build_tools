@@ -23,7 +23,8 @@ except ImportError:
         print(f'  {custom_build_tools_folder / "custom_spec.py"}',
               file=sys.stderr)
         print('Using default build specification.', file=sys.stderr)
-        return None
+        custom_build_spec: Optional[BuildSpec] = None
+        return custom_build_spec
 
 
 def _default_build_spec() -> BuildSpec:

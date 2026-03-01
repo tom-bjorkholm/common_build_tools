@@ -10,8 +10,8 @@ from typing import Optional
 from build_information import get_build_information
 from build_spec import BuildInformation, BuildSpec
 from build_utils import extract_python_name, run_command, venv_script
-from clean_build import clean_build
 from get_build_spec import get_build_spec
+from clean_build import clean_build
 
 
 def _run_clean_build_or_fail(python_name: Optional[str], run_name: str,

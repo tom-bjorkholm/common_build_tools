@@ -11,9 +11,8 @@ import re
 import shutil
 import subprocess
 import sys
-from typing import Callable, NamedTuple, Optional, cast
+from typing import NamedTuple, Optional
 
-from end_of_line import dos2unix
 from best_installed_python import resolve_target_python
 from build_information import get_build_information
 from build_spec import (
@@ -30,6 +29,7 @@ from build_utils import (
     venv_script,
 )
 from get_build_spec import get_build_spec
+from git_helpers import restore_bad_eol_changes
 from setup_build_environment import setup_build_environment
 
 REPORT_DIR_NAME = 'reports'
@@ -54,21 +54,6 @@ REPORT_LINKS = [
     ('build_log.txt', 'build log'),
     ('pytest_log.txt', 'pytest log'),
 ]
-
-EOL_ALLOWED_PATTERNS: tuple[str, ...] = (
-    r'.*\.py$',
-    r'.*\.md$',
-    r'.*\.rst$',
-    r'.*\.txt$',
-    r'.*\.html$',
-    r'.*\.css$',
-    r'.*\.js$',
-    r'.*\.json$',
-    r'.*\.xml$',
-    r'.*\.yaml$',
-    r'.*\.yml$',
-    r'.*\.ini$',
-)
 
 
 class ReportSummary(NamedTuple):
@@ -571,64 +556,13 @@ def _generate_reports(
     return 0
 
 
-def _fallback_restore_line_end_only_changes(project_root: Path) -> list[Path]:
-    """Restore line-ending-only changes without gitpython dependency."""
-    changed_process = subprocess.run(
-        ['git', 'diff', '--name-only', '--diff-filter=ACMRTUXB'],
-        capture_output=True,
-        text=True,
-        check=False,
-        cwd=project_root,
-    )
-    if changed_process.returncode != 0:
-        return []
-    restored: list[Path] = []
-    for rel_text in changed_process.stdout.splitlines():
-        relative_path = Path(rel_text.strip())
-        if not relative_path.as_posix():
-            continue
-        if not any(re.match(pattern, relative_path.as_posix())
-                   for pattern in EOL_ALLOWED_PATTERNS):
-            continue
-        file_path = project_root / relative_path
-        if not file_path.is_file():
-            continue
-        diff_process = subprocess.run(
-            ['git', 'diff', '--ignore-cr-at-eol', '--ignore-space-at-eol',
-             '--', relative_path.as_posix()],
-            capture_output=True,
-            text=True,
-            check=False,
-            cwd=project_root,
-        )
-        if diff_process.returncode != 0:
-            continue
-        if diff_process.stdout.strip():
-            continue
-        dos2unix(file_path)
-        restored.append(relative_path)
-    return restored
-
-
-def _restore_line_end_only_changes(project_root: Path) -> list[Path]:
+def _restore_line_end_only_changes() -> list[Path]:
     """Restore files changed only by line endings and return restored paths."""
-    try:
-        git_helpers_module = __import__('git_helpers')
-        restore_bad_eol_changes = cast(
-            Callable[..., list[Path]],
-            getattr(git_helpers_module, 'restore_bad_eol_changes')
-        )
-        return restore_bad_eol_changes(
-            all_submodules=True,
-            force_unix=False,
-            verbose=True
-        )
-    except (ImportError, SystemExit):
-        return _fallback_restore_line_end_only_changes(project_root)
-    except (ValueError, RuntimeError, OSError) as exc:
-        print(f'Warning: failed line-ending restore check: {exc}',
-              file=sys.stderr)
-        return []
+    return restore_bad_eol_changes(
+        all_submodules=True,
+        force_unix=False,
+        verbose=True
+    )
 
 
 def do_build(python_name: Optional[str] = None,
@@ -705,7 +639,7 @@ def do_build(python_name: Optional[str] = None,
     )
     _run_custom_hooks(active_spec.custom_final, active_spec,
                       active_information)
-    restored_files = _restore_line_end_only_changes(project_root)
+    restored_files = _restore_line_end_only_changes()
     if restored_files:
         print(f'Restored {len(restored_files)} line-ending-only changes.',
               file=sys.stderr)

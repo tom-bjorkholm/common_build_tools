@@ -18,22 +18,7 @@ except ImportError:
           file=sys.stderr)
     sys.exit(1)
 from end_of_line import dos2unix
-
-
-DEF_ALLOWED: tuple[str, ...] = (
-    r'.*\.py$',
-    r'.*\.md$',
-    r'.*\.rst$',
-    r'.*\.txt$',
-    r'.*\.html$',
-    r'.*\.css$',
-    r'.*\.js$',
-    r'.*\.json$',
-    r'.*\.xml$',
-    r'.*\.yaml$',
-    r'.*\.yml$',
-    r'.*\.ini$',
-)
+from eol_patterns import EOL_ALLOWED_PATTERNS
 
 
 def get_git_root(pathlocation: Optional[Path] = None,
@@ -310,7 +295,7 @@ def restore_bad_eol_changes(all_submodules: bool = True,
         A list of Path objects representing the files that were restored
         or changed to Unix line endings.
     """
-    patterns = list(DEF_ALLOWED if allowed_patterns is None
+    patterns = list(EOL_ALLOWED_PATTERNS if allowed_patterns is None
                     else allowed_patterns)
     main_repo = _get_main_repo()
     candidate_files = _candidate_files_for_restore(
