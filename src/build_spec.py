@@ -122,3 +122,6 @@ class BuildSpec(NamedTuple):
 
     custom_build_tools_folder: Path = Path('custom_build_tools')
     """Folder containing project-specific build hooks and config files."""
+
+    additional_venv_packages: Optional[list[str]] = None
+    """Additional packages to install in the venv."""
