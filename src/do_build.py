@@ -254,7 +254,8 @@ def _run_mypy(venv_cmd: list[str], build_information: BuildInformation,
         additional_paths=build_information['mypy_path_folders']
     )
     return run_command_logged(
-        [*venv_cmd, '-m', 'mypy', '--strict', '--html-report', str(mypy_dir),
+        [*venv_cmd, '-m', 'mypy', '--strict', '--explicit-package-bases',
+         '--html-report', str(mypy_dir),
          *[str(path) for path in build_information['mypy_folders']]],
         log_file=mypy_log,
         check=False,
