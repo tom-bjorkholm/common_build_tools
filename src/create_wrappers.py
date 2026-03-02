@@ -20,24 +20,13 @@ def _wrapper_content(target_script_name: str) -> str:
         '#! /usr/bin/env python3\n'
         f'"""Thin wrapper calling common_build_tools/src/'
         f'{target_script_name}."""\n\n'
-        'from pathlib import Path\n'
-        'import subprocess\n'
-        'import sys\n\n\n'
-        'def main(args: list[str]) -> int:\n'
-        '    """Run the target script in common_build_tools/src."""\n'
-        '    script_path = (\n'
-        '        Path(__file__).resolve().parent /\n'
-        "        'common_build_tools' /\n"
-        "        'src' /\n"
-        f"        '{target_script_name}'\n"
-        '    )\n'
-        '    process = subprocess.run(\n'
-        '        [sys.executable, str(script_path), *args],\n'
-        '        check=False,\n'
-        '    )\n'
-        '    return process.returncode\n\n\n'
+        'import sys\n'
+        'from run_wrapper_common import run_target_script\n\n\n'
         "if __name__ == '__main__':\n"
-        '    sys.exit(main(sys.argv[1:]))\n'
+        '    sys.exit(run_target_script(\n'
+        f"        '{target_script_name}',\n"
+        '        sys.argv[1:],\n'
+        '    ))\n'
     )
 
 
@@ -57,9 +46,9 @@ def _set_wrapper_permissions(wrapper_path: Path) -> None:
 def create_wrappers() -> None:
     """Create all wrapper files in repository root."""
     root_path = _project_root()
-    for wrapper_name in WRAPPER_FILES:
+    for wrapper_name, target_script_name in WRAPPER_FILES:
         wrapper_path = root_path / wrapper_name
-        _write_wrapper_file(wrapper_path, wrapper_name)
+        _write_wrapper_file(wrapper_path, target_script_name)
         _set_wrapper_permissions(wrapper_path)
         print(f'Created wrapper: {wrapper_path}')
 

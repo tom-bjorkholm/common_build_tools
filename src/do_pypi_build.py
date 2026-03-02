@@ -53,8 +53,7 @@ def do_pypi_build(python_name: Optional[str] = None,
         return second_result
     if not twine_upload:
         print('Twine upload not done as it was not requested.')
-        print('To upload to PyPI, run: python3 '
-              'common_build_tools/src/do_pypi_build.py twine')
+        print('To upload to PyPI, run: python3 run_pypi_build.py twine')
         return 0
     dist_dir = active_information['project_root'] / 'dist'
     dist_files = sorted(str(path) for path in dist_dir.iterdir())

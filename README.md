@@ -141,8 +141,7 @@ build flow are (from a user's point of view):
     environment (venv) active.
     (This means that imports from the installed packages are working.
     Pylint results are shown as `::PYLINT` test items in
-    `./reports/pytest_report.html`.
-    Convenience wrapper scripts in repo root are ignored.)
+    `./reports/pytest_report.html`.)
 
 12. Run `custom_after_test` hooks.
     If `custom_after_test` hooks are configured in the `BuildSpec` they
@@ -188,21 +187,19 @@ Names like `./common_build_tools/src/setup_build_environment.py` are a bit long 
 To save some typing the script `./common_build_tools/src/create_wrappers.py` can be run once
 to create thin wrapper scripts in main repo root:
 
-- `./setup_build_environment.py`
+- `./run_setup_build_environment.py`
 
-- `./do_build.py`
+- `./run_build.py`
 
-- `./clean_build.py`
+- `./run_clean_build.py`
 
-- `./do_pypi_build.py`
+- `./run_pypi_build.py`
 
-- `./clean.py`
-
-- `./setup_build_environment.py`
-
+- `./run_clean.py`
 
 #### Tests in build
 
 The "testing" includes flake8, mypy and pytest with pytest-pylint.
 
-After running `do_build.py` you can open `./reports/index.html` to see all test reports.
+After running `run_build.py` you can open `./reports/index.html` to see all
+test reports.

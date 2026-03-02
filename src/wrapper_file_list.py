@@ -1,13 +1,13 @@
 #! /usr/bin/env python3
-"""List of wrapper files for common_build_tools."""
+"""Wrapper files in repo root and their target scripts."""
 
 # Copyright (c) 2026 Tom Björkholm
 # MIT License
 
-WRAPPER_FILES: tuple[str, ...] = (
-    'clean.py',
-    'clean_build.py',
-    'do_build.py',
-    'do_pypi_build.py',
-    'setup_build_environment.py',
+WRAPPER_FILES: tuple[tuple[str, str], ...] = (
+    ('run_build.py', 'do_build.py'),
+    ('run_clean_build.py', 'clean_build.py'),
+    ('run_pypi_build.py', 'do_pypi_build.py'),
+    ('run_clean.py', 'clean.py'),
+    ('run_setup_build_environment.py', 'setup_build_environment.py'),
 )

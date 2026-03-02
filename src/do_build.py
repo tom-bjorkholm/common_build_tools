@@ -31,7 +31,6 @@ from build_utils import (
 from get_build_spec import get_build_spec
 from git_helpers import restore_bad_eol_changes
 from setup_build_environment import setup_build_environment
-from wrapper_file_list import WRAPPER_FILES as PYTEST_IGNORE_WRAPPER_FILES
 
 
 REPORT_DIR_NAME = 'reports'
@@ -298,17 +297,6 @@ def _pytest_collection_folders(
     return unique_folders
 
 
-def _pytest_ignore_files(build_information: BuildInformation) -> list[Path]:
-    """Return root wrapper script paths to ignore in pytest collection."""
-    project_root = build_information['project_root']
-    ignored_files: list[Path] = []
-    for file_name in PYTEST_IGNORE_WRAPPER_FILES:
-        file_path = project_root / file_name
-        if file_path.is_file():
-            ignored_files.append(file_path)
-    return ignored_files
-
-
 def _pytest_command(venv_cmd: list[str], build_information: BuildInformation,
                     report_dir: Path) -> list[str]:
     """Construct pytest command for discovered test and pylint folders."""
@@ -316,8 +304,6 @@ def _pytest_command(venv_cmd: list[str], build_information: BuildInformation,
     command.extend(
         str(path) for path in _pytest_collection_folders(build_information)
     )
-    for ignore_file in _pytest_ignore_files(build_information):
-        command.append(f'--ignore={ignore_file}')
     command.extend([
         f'--html={report_dir / "pytest_report.html"}',
         '--self-contained-html',
