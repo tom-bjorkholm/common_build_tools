@@ -6,15 +6,7 @@
 
 import os
 from pathlib import Path
-
-
-WRAPPER_FILES: tuple[str, ...] = (
-    'clean.py',
-    'clean_build.py',
-    'do_build.py',
-    'do_pypi_build.py',
-    'setup_build_environment.py',
-)
+from wrapper_file_list import WRAPPER_FILES
 
 
 def _project_root() -> Path:

@@ -31,6 +31,8 @@ from build_utils import (
 from get_build_spec import get_build_spec
 from git_helpers import restore_bad_eol_changes
 from setup_build_environment import setup_build_environment
+from wrapper_file_list import WRAPPER_FILES as PYTEST_IGNORE_WRAPPER_FILES
+
 
 REPORT_DIR_NAME = 'reports'
 DIST_DIR_NAME = 'dist'
@@ -216,32 +218,6 @@ def _install_packages(venv_cmd: list[str], build_information: BuildInformation,
     return 0
 
 
-def _collect_python_files(folders: list[Path]) -> list[str]:
-    """Collect python file paths from provided folder list."""
-    files: list[str] = []
-    for folder in folders:
-        if not folder.is_dir():
-            continue
-        files.extend(str(path) for path in folder.rglob('*.py'))
-    return sorted(set(files))
-
-
-def _run_pylint(venv_cmd: list[str], build_information: BuildInformation,
-                pylint_log: Path, project_root: Path) -> int:
-    """Run pylint on discovered folders."""
-    pylint_files = _collect_python_files(build_information['pylint_folders'])
-    if not pylint_files:
-        pylint_log.write_text('No pylint targets discovered.\n',
-                              encoding='utf-8')
-        return 0
-    return run_command_logged(
-        [*venv_cmd, '-m', 'pylint', *pylint_files],
-        log_file=pylint_log,
-        check=False,
-        cwd=project_root,
-    )
-
-
 def _run_mypy(venv_cmd: list[str], build_information: BuildInformation,
               mypy_log: Path, mypy_dir: Path, project_root: Path) -> int:
     """Run mypy in strict mode on discovered folders."""
@@ -284,13 +260,7 @@ def _run_flake8(venv_cmd: list[str], build_information: BuildInformation,
 def _run_linters(venv_cmd: list[str], build_information: BuildInformation,
                  report_paths: dict[str, Path], project_root: Path) -> \
         dict[str, int]:
-    """Run pylint, mypy and flake8 and return their exit codes."""
-    pylint_code = _run_pylint(
-        venv_cmd=venv_cmd,
-        build_information=build_information,
-        pylint_log=report_paths['pylint_log'],
-        project_root=project_root
-    )
+    """Run mypy and flake8 and return their exit codes."""
     mypy_code = _run_mypy(
         venv_cmd=venv_cmd,
         build_information=build_information,
@@ -306,21 +276,54 @@ def _run_linters(venv_cmd: list[str], build_information: BuildInformation,
         project_root=project_root
     )
     return {
-        'pylint': pylint_code,
         'mypy': mypy_code,
         'flake8': flake8_code,
     }
 
 
+def _pytest_collection_folders(
+        build_information: BuildInformation) -> list[Path]:
+    """Return pytest collection folders for tests and pylint targets."""
+    folders = (
+        build_information['pytest_folders'] +
+        build_information['pylint_folders']
+    )
+    unique_folders: list[Path] = []
+    seen: set[Path] = set()
+    for folder in folders:
+        if folder in seen:
+            continue
+        seen.add(folder)
+        unique_folders.append(folder)
+    return unique_folders
+
+
+def _pytest_ignore_files(build_information: BuildInformation) -> list[Path]:
+    """Return root wrapper script paths to ignore in pytest collection."""
+    project_root = build_information['project_root']
+    ignored_files: list[Path] = []
+    for file_name in PYTEST_IGNORE_WRAPPER_FILES:
+        file_path = project_root / file_name
+        if file_path.is_file():
+            ignored_files.append(file_path)
+    return ignored_files
+
+
 def _pytest_command(venv_cmd: list[str], build_information: BuildInformation,
                     report_dir: Path) -> list[str]:
-    """Construct pytest command for discovered test folders."""
+    """Construct pytest command for discovered test and pylint folders."""
     command = [*venv_cmd, '-m', 'pytest']
-    command.extend(str(path) for path in build_information['pytest_folders'])
+    command.extend(
+        str(path) for path in _pytest_collection_folders(build_information)
+    )
+    for ignore_file in _pytest_ignore_files(build_information):
+        command.append(f'--ignore={ignore_file}')
     command.extend([
         f'--html={report_dir / "pytest_report.html"}',
         '--self-contained-html',
         f'--cov-report=html:{report_dir / "coverage"}',
+        '--pylint',
+        f'--pylint-output-file={report_dir / PYLINT_LOG_NAME}',
     ])
     for package_data in build_information['package_information']:
         command.append(f'--cov={package_data["normalized_name"]}')
@@ -328,13 +331,16 @@ def _pytest_command(venv_cmd: list[str], build_information: BuildInformation,
 
 
 def _run_pytest(venv_cmd: list[str], build_information: BuildInformation,
-                pytest_log: Path, report_dir: Path,
-                project_root: Path) -> int:
+                pytest_log: Path, report_dir: Path, project_root: Path) -> int:
     """Run pytest and return pytest exit code."""
-    if not build_information['pytest_folders']:
+    pylint_log = report_dir / PYLINT_LOG_NAME
+    if not _pytest_collection_folders(build_information):
         pytest_log.write_text('No pytest targets discovered.\n',
                               encoding='utf-8')
+        pylint_log.write_text('No pylint targets discovered.\n',
+                              encoding='utf-8')
         return 0
+    pylint_log.touch(exist_ok=True)
     return run_command_logged(
         _pytest_command(venv_cmd=venv_cmd,
                         build_information=build_information,

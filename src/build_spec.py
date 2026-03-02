@@ -52,14 +52,14 @@ class BuildSpec(NamedTuple):
     7. Run `custom_before_install` hooks.
     8. Install built wheel packages in dependency order.
     9. Run `custom_before_test` hooks.
-    10. Run flake8, pylint and mypy on discovered folders.
-    11. Run pytest on discovered test folders.
+    10. Run flake8 and mypy on discovered folders.
+    11. Run pytest on discovered test and pylint folders.
     12. Run `custom_after_test` hooks.
     13. Run pydoc-markdown for
         `custom_build_tools/pydoc-markdown*.yml` in project root.
-    14. Generate reports under `reports/` and update README summaries.
-    15. Run `custom_final` hooks.
-    16. Restore generated files with line-ending-only git changes.
+    14. Run `custom_final` hooks.
+    15. Restore generated files with line-ending-only git changes.
+    16. Generate reports under `reports/` and update README summaries.
     """
 
     package_folders: Optional[list[Path]] = None

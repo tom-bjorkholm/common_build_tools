@@ -47,7 +47,8 @@ git submodule add -b master git@bitbucket.org:tom-bjorkholm/common_build_tools.g
 These common build tools are designed to be shared between a few projects
 that share some specific requirements. These requirements are:
 
-- pytest, pylint (inside pytest) and mypy are used to check the code.
+- pytest, pylint (inside pytest with pytest-pylint), flake8 and mypy are used
+  to check the code.
 
 - each project is building one or more .whl files. The .whl files are configured
   by either a `pyproject.toml` file, a `setup.py` file or both.
@@ -132,13 +133,16 @@ build flow are (from a user's point of view):
    If `custom_before_test` hooks are configured in the `BuildSpec` they
    are run.
 
-10. Run flake8, pylint and mypy on discovered folders, with the virtual
+10. Run flake8 and mypy on discovered folders, with the virtual
     environment (venv) active. (This means that imports from the
     installed packages are working.)
 
-11. Run pytest on discovered test folders, with the virtual
-    environment (venv) active. (This means that imports from the
-    installed packages are working.)
+11. Run pytest on discovered test and pylint folders, with the virtual
+    environment (venv) active.
+    (This means that imports from the installed packages are working.
+    Pylint results are shown as `::PYLINT` test items in
+    `./reports/pytest_report.html`.
+    Convenience wrapper scripts in repo root are ignored.)
 
 12. Run `custom_after_test` hooks.
     If `custom_after_test` hooks are configured in the `BuildSpec` they
@@ -155,7 +159,6 @@ build flow are (from a user's point of view):
 
 16. Generate reports under `./reports/` and update README summaries.
 
-
 ### Building application
 
 There are 3 entry point scripts (and 2 extra convenience scripts) for building the application:
@@ -163,7 +166,6 @@ There are 3 entry point scripts (and 2 extra convenience scripts) for building t
 - `./common_build_tools/src/setup_build_environment.py` Run this script first to get the environment
   set up for building and for IDE to be able to find installed dependent packages.
   This script is called internally from `do_build.py` if the environment is not already set up.
-
 
 - `./common_build_tools/src/do_build.py` Run this script to build an installation package (.whl) and
   to run the tests on it in a venv (virtual environment).
@@ -201,6 +203,6 @@ to create thin wrapper scripts in main repo root:
 
 #### Tests in build
 
-The "testing" includes pytest, pylint, flake8 and mypy.
+The "testing" includes flake8, mypy and pytest with pytest-pylint.
 
 After running `do_build.py` you can open `./reports/index.html` to see all test reports.
