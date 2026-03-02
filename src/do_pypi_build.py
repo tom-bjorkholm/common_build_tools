@@ -62,7 +62,15 @@ def do_pypi_build(python_name: Optional[str] = None,
     return 0
 
 
+def do_pypi_build_cmd(build_spec: Optional[BuildSpec] = None,
+                      build_information: Optional[BuildInformation] = None) \
+                          -> None:
+    """Run do pypi build command."""
+    python_name = extract_python_name(sys.argv[1:])
+    twine_upload = 'twine' in sys.argv[1:]
+    sys.exit(do_pypi_build(python_name, twine_upload, build_spec,
+                           build_information))
+
+
 if __name__ == '__main__':
-    PYTHON_NAME = extract_python_name(sys.argv[1:])
-    TWINE_UPLOAD = 'twine' in sys.argv[1:]
-    sys.exit(do_pypi_build(PYTHON_NAME, TWINE_UPLOAD))
+    do_pypi_build_cmd()

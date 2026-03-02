@@ -155,5 +155,16 @@ def setup_build_environment(python_name: str | None = None,
     _install_venv_packages(active_spec, active_information)
 
 
+def setup_build_environment_cmd(build_spec: Optional[BuildSpec]
+                                = None,
+                                build_information: Optional[BuildInformation]
+                                = None) -> None:
+    """Run setup build environment command."""
+    python_name = extract_python_name(sys.argv[1:])
+    setup_build_environment(python_name, False,
+                            build_spec, build_information)
+    sys.exit(0)
+
+
 if __name__ == '__main__':
-    setup_build_environment(extract_python_name(sys.argv[1:]))
+    setup_build_environment_cmd()

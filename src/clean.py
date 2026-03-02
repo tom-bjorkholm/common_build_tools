@@ -4,6 +4,7 @@
 # Copyright (c) 2026 Tom Björkholm
 # MIT License
 
+import sys
 import shutil
 from pathlib import Path
 from typing import Optional
@@ -68,3 +69,15 @@ def clean(build_spec: Optional[BuildSpec] = None,
             coverage_item.unlink(missing_ok=True)
     for pattern in PATTERNS_TO_REMOVE:
         _remove_matching(pattern=pattern, project_root=project_root)
+
+
+def clean_cmd(build_spec: Optional[BuildSpec] = None,
+              build_information: Optional[BuildInformation] = None) \
+                  -> None:
+    """Run clean command."""
+    clean(build_spec, build_information)
+    sys.exit(0)
+
+
+if __name__ == '__main__':
+    clean_cmd()

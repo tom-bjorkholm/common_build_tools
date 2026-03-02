@@ -5,9 +5,9 @@
 # MIT License
 
 WRAPPER_FILES: tuple[tuple[str, str], ...] = (
-    ('run_build.py', 'do_build.py'),
-    ('run_clean_build.py', 'clean_build.py'),
-    ('run_pypi_build.py', 'do_pypi_build.py'),
-    ('run_clean.py', 'clean.py'),
-    ('run_setup_build_environment.py', 'setup_build_environment.py'),
+    ('run_build.py', 'do_build'),
+    ('run_clean_build.py', 'clean_build'),
+    ('run_pypi_build.py', 'do_pypi_build'),
+    ('run_clean.py', 'clean'),
+    ('run_setup_build_environment.py', 'setup_build_environment'),
 )

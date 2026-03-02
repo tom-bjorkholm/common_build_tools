@@ -648,6 +648,12 @@ def do_build(python_name: Optional[str] = None,
     return report_code
 
 
+def do_build_cmd(build_spec: Optional[BuildSpec] = None,
+                 build_information: Optional[BuildInformation] = None) -> None:
+    """Run build command."""
+    python_name = extract_python_name(sys.argv[1:])
+    sys.exit(do_build(python_name, build_spec, build_information))
+
+
 if __name__ == '__main__':
-    PYTHON_NAME = extract_python_name(sys.argv[1:])
-    sys.exit(do_build(PYTHON_NAME))
+    do_build_cmd()

@@ -18,15 +18,16 @@ def _wrapper_content(target_script_name: str) -> str:
     """Return Python source code for one generated wrapper file."""
     return (
         '#! /usr/bin/env python3\n'
-        f'"""Thin wrapper calling common_build_tools/src/'
-        f'{target_script_name}."""\n\n'
+        f'"""Thin wrapper calling {target_script_name} in '
+        'common_build_tools/src."""\n\n'
         'import sys\n'
-        'from run_wrapper_common import run_target_script\n\n\n'
+        'from pathlib import Path\n'
+        'sys.path.insert(0, str(Path(__file__).parent / '
+        "'common_build_tools' / 'src'))\n"
+        f'from {target_script_name} import {target_script_name}_cmd  '
+        '# pylint: disable=wrong-import-position # noqa: E402\n\n\n'
         "if __name__ == '__main__':\n"
-        '    sys.exit(run_target_script(\n'
-        f"        '{target_script_name}',\n"
-        '        sys.argv[1:],\n'
-        '    ))\n'
+        f'    {target_script_name}_cmd()\n'
     )
 
 
