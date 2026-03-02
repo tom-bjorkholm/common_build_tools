@@ -7,7 +7,7 @@ It is usually **not** useful to `git clone` this repository.
 ## Common build tools as submodule
 
 This repo is intended as a submodule for some specific git repos that share
-the same same common build tools.
+the same common build tools.
 
 ### Use in a repo already set up with this submodule
 
@@ -69,7 +69,7 @@ that share some specific requirements. These requirements are:
 - the results of building and testing is stored in folder `./reports` under the
   main repo root. The test summary is updated in the README files.
 
-- there is a file `./reports/index.htlm` to provide easy access to build and test
+- there is a file `./reports/index.html` to provide easy access to build and test
   results for the programmer.
 
 ### Use and constraints
@@ -99,7 +99,7 @@ build flow are (from a user's point of view):
 1. Discover package and folder information.
    If `BuildSpec` specifies `package_folders` only those will be built
    as .whl packages. If `package_folders` is not specified any folder that
-   contains a `pyproject.toml` file, or a `setup.py` folder or both is
+   contains a `pyproject.toml` file, or a `setup.py` file or both is
    a folder to be built into a .whl package.
 
 2. Verify consistency.
@@ -147,10 +147,60 @@ build flow are (from a user's point of view):
 13. Run pydoc-markdown for every `./custom_build_tools/pydoc-markdown*.yml`
     in project root, if any.
 
-14. Generate reports under `./reports/` and update README summaries.
-
-15. Run `custom_final` hooks.
+14. Run `custom_final` hooks.
     If `custom_final` hooks are configured in the `BuildSpec` they
     are run.
 
-16. Restore generated files with line-ending-only git changes.
+15. Restore generated files with line-ending-only git changes.
+
+16. Generate reports under `./reports/` and update README summaries.
+
+
+### Building application
+
+There are 3 entry point scripts (and 2 extra convenience scripts) for building the application:
+
+- `./common_build_tools/src/setup_build_environment.py` Run this script first to get the environment
+  set up for building and for IDE to be able to find installed dependent packages.
+  This script is called internally from `do_build.py` if the environment is not already set up.
+
+
+- `./common_build_tools/src/do_build.py` Run this script to build an installation package (.whl) and
+  to run the tests on it in a venv (virtual environment).
+
+- `./common_build_tools/src/clean.py` Deletes all files that was produced by the build to start over
+  from a clean state.
+
+- `./common_build_tools/src/clean_build.py` Combines the use of `clean.py`, `setup_build_environment.py`
+  and `do_build.py` into one script. Pylint discover some duplicate code warnings only on a clean
+  build so this is useful.
+
+- `./common_build_tools/src/do_pypi_build.py` Builds for PyPI upload and can do the upload too.
+  As the test status is added to the `README_pypi.md` only at the end of the test of the installed
+  .whl file, and the `README_pypi.md` is packaged into the .whl file, this requires two consecutive
+  runs of `clean_build.py`.
+
+#### Convenience wrapper scripts
+
+Names like `./common_build_tools/src/setup_build_environment.py` are a bit long to type.
+To save some typing the script `./common_build_tools/src/create_wrappers.py` can be run once
+to create thin wrapper scripts in main repo root:
+
+- `./setup_build_environment.py`
+
+- `./do_build.py`
+
+- `./clean_build.py`
+
+- `./do_pypi_build.py`
+
+- `./clean.py`
+
+- `./setup_build_environment.py`
+
+
+#### Tests in build
+
+The "testing" includes pytest, pylint, flake8 and mypy.
+
+After running `do_build.py` you can open `./reports/index.html` to see all test reports.
