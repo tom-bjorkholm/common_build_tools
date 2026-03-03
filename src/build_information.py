@@ -457,10 +457,10 @@ def _merge_and_filter_folders(default_folders: list[Path],
             if _is_path_included(folder, excluded)]
 
 
-def _default_mypy_path_folders(mypy_defaults: list[Path],
+def _default_mypy_path_folders(src_folders: list[Path],
                                project_root: Path) -> list[Path]:
     """Return default folder list for MYPYPATH used in mypy runs."""
-    defaults = list(mypy_defaults)
+    defaults = list(src_folders)
     custom_tools_folder = (project_root / 'custom_build_tools').resolve()
     if custom_tools_folder.is_dir():
         defaults.append(custom_tools_folder)
@@ -517,7 +517,7 @@ def discover_build_information(build_spec: BuildSpec,
     )
     mypy_paths = _merge_and_filter_folders(
         default_folders=_default_mypy_path_folders(
-            mypy_defaults=mypy_defaults,
+            src_folders=src_folders,
             project_root=resolved_root
         ),
         additional_folders=build_spec.mypy_paths,
