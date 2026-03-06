@@ -197,6 +197,11 @@ to create thin wrapper scripts in main repo root:
 
 - `./run_clean.py`
 
+The script `./common_build_tools/src/create_wrappers.py` will also create the
+folder structure `./custom_build_tools` that these build tools expect. This is
+intended as a starting point for any customization how the build should be
+performed.
+
 #### Tests in build
 
 The "testing" includes flake8, mypy and pytest with pytest-pylint.

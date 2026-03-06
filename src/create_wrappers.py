@@ -44,6 +44,44 @@ def _set_wrapper_permissions(wrapper_path: Path) -> None:
     wrapper_path.chmod(0o755)
 
 
+CUSTOM_BUILD_TOOLS_SPEC_CONTENT = '''
+from typing import Optional
+from pathlib import Path
+import sys
+COMMON_BUILD_TOOLS_SRC = (
+    Path(__file__).resolve().parents[1] / 'common_build_tools' / 'src'
+)
+CUSTOM_BUILD_TOOLS_SRC = Path(__file__).resolve().parent / 'src'
+sys.path.insert(0, str(COMMON_BUILD_TOOLS_SRC))
+sys.path.insert(0, str(CUSTOM_BUILD_TOOLS_SRC))
+# pylint: disable=wrong-import-position
+from build_spec import BuildSpec  # noqa: E402
+
+
+# # example of custom build specification
+#def custom_spec() -> Optional[BuildSpec]:
+#    """Return custom build spec for this repository."""
+#    return BuildSpec(
+#        package_folders=None,
+#        identical_versions=True,
+#        mypy_on_test=True,
+#    )
+'''
+
+def create_custom_folder_structure(root_path: Path) -> None:
+    """Create custom folder structure in repository root if not exists."""
+    custom_build_tools_path: Path = root_path / 'custom_build_tools'
+    if not custom_build_tools_path.exists():
+        custom_build_tools_path.mkdir()
+    for dir in ['test', 'src']:
+        custom_build_tools_dir_path: Path = custom_build_tools_path / dir
+        if not custom_build_tools_dir_path.exists():
+            custom_build_tools_dir_path.mkdir()
+    custom_spec_path: Path = custom_build_tools_path / 'custom_spec.py'
+    if not custom_spec_path.exists():
+        custom_spec_path.write_text(CUSTOM_BUILD_TOOLS_SPEC_CONTENT)
+
+
 def create_wrappers() -> None:
     """Create all wrapper files in repository root."""
     root_path = _project_root()
@@ -52,6 +90,7 @@ def create_wrappers() -> None:
         _write_wrapper_file(wrapper_path, target_script_name)
         _set_wrapper_permissions(wrapper_path)
         print(f'Created wrapper: {wrapper_path}')
+    create_custom_folder_structure(root_path)
 
 
 if __name__ == '__main__':
