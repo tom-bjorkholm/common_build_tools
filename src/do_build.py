@@ -172,7 +172,7 @@ def _build_packages(venv_cmd: list[str], build_information: BuildInformation,
 
 def _wheel_regex_for_package(package_name: str) -> re.Pattern[str]:
     """Return regex for wheel files of one package."""
-    escaped_name = re.escape(package_name).replace(r'\_', '[-_]')
+    escaped_name = re.escape(package_name).replace('_', '[-_]')
     return re.compile(rf'^{escaped_name}-.*\.whl$')
 
 

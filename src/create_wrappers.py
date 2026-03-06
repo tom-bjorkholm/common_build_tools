@@ -45,41 +45,41 @@ def _set_wrapper_permissions(wrapper_path: Path) -> None:
 
 
 CUSTOM_BUILD_TOOLS_SPEC_CONTENT = '''
-from typing import Optional
+"""Repository-specific build specification for common_build_tools."""
+
 from pathlib import Path
 import sys
-COMMON_BUILD_TOOLS_SRC = (
-    Path(__file__).resolve().parents[1] / 'common_build_tools' / 'src'
-)
-CUSTOM_BUILD_TOOLS_SRC = Path(__file__).resolve().parent / 'src'
-sys.path.insert(0, str(COMMON_BUILD_TOOLS_SRC))
-sys.path.insert(0, str(CUSTOM_BUILD_TOOLS_SRC))
+from typing import Optional
+
+_THIS_DIR = Path(__file__).resolve().parent
+_REPO_ROOT = _THIS_DIR.parent
+_COMMON_BUILD_TOOLS_SRC = _REPO_ROOT / 'common_build_tools' / 'src'
+_CUSTOM_BUILD_TOOLS_SRC = _THIS_DIR / 'src'
+sys.path.insert(0, str(_COMMON_BUILD_TOOLS_SRC))
+sys.path.insert(0, str(_CUSTOM_BUILD_TOOLS_SRC))
 # pylint: disable=wrong-import-position
 from build_spec import BuildSpec  # noqa: E402
 
 
-# # example of custom build specification
-#def custom_spec() -> Optional[BuildSpec]:
-#    """Return custom build spec for this repository."""
-#    return BuildSpec(
-#        package_folders=None,
-#        identical_versions=True,
-#        mypy_on_test=True,
-#    )
+def custom_spec() -> Optional[BuildSpec]:
+    """Return custom build spec for this repository."""
+    return None
 '''
+
 
 def create_custom_folder_structure(root_path: Path) -> None:
     """Create custom folder structure in repository root if not exists."""
     custom_build_tools_path: Path = root_path / 'custom_build_tools'
     if not custom_build_tools_path.exists():
         custom_build_tools_path.mkdir()
-    for dir in ['test', 'src']:
-        custom_build_tools_dir_path: Path = custom_build_tools_path / dir
+    for folder_name in ['test', 'src']:
+        custom_build_tools_dir_path = custom_build_tools_path / folder_name
         if not custom_build_tools_dir_path.exists():
             custom_build_tools_dir_path.mkdir()
     custom_spec_path: Path = custom_build_tools_path / 'custom_spec.py'
     if not custom_spec_path.exists():
-        custom_spec_path.write_text(CUSTOM_BUILD_TOOLS_SPEC_CONTENT)
+        custom_spec_path.write_text(CUSTOM_BUILD_TOOLS_SPEC_CONTENT,
+                                    encoding='utf-8')
 
 
 def create_wrappers() -> None:
