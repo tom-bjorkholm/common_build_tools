@@ -25,7 +25,7 @@ def test_get_build_spec_returns_default_when_custom_none(
     """Test get_build_spec falls back to default when custom returns None."""
     monkeypatch.setattr(get_build_spec, 'custom_spec', lambda: None)
     resolved = get_build_spec.get_build_spec()
-    assert resolved == get_build_spec._default_build_spec()
+    assert resolved == BuildSpec()
 
 
 def test_get_build_spec_returns_custom_build_spec(
@@ -43,6 +43,6 @@ def test_get_build_spec_rejects_invalid_custom_type(
     """Test get_build_spec prints error and returns default on bad type."""
     monkeypatch.setattr(get_build_spec, 'custom_spec', lambda: 'invalid')
     resolved = get_build_spec.get_build_spec()
-    assert resolved == get_build_spec._default_build_spec()
+    assert resolved == BuildSpec()
     captured = capsys.readouterr()
     assert 'custom_spec() did not return BuildSpec.' in captured.err

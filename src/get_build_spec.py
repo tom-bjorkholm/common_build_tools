@@ -27,11 +27,6 @@ except ImportError:
         return custom_build_spec
 
 
-def _default_build_spec() -> BuildSpec:
-    """Return the default build specification."""
-    return BuildSpec()
-
-
 def get_build_spec() -> BuildSpec:
     """Get the active build specification.
 
