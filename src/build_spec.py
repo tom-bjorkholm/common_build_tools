@@ -72,7 +72,7 @@ class BuildSpec(NamedTuple):
     identical_versions: bool = True
     """If True all discovered packages must have the same version."""
 
-    mypy_on_test: bool = False
+    mypy_on_test: bool = True
     """If True run mypy also on discovered `test` folders."""
 
     custom_before_clean: Optional[list[CustomFunction]] = None

@@ -16,7 +16,7 @@ def test_default_build_spec_has_expected_defaults() -> None:
     default_spec = BuildSpec()
     assert default_spec.package_folders is None
     assert default_spec.identical_versions is True
-    assert default_spec.mypy_on_test is False
+    assert default_spec.mypy_on_test is True
     assert default_spec.custom_final is None
 
 
