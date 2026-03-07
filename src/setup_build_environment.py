@@ -39,6 +39,7 @@ VENV_PACKAGES = [
     'mypy',
     'coverage',
     'pydoc-markdown',
+    'lxml',
     'gitpython',
     'pytest-flake8',
     'pytest-pylint',

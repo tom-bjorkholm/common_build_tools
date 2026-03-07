@@ -92,6 +92,13 @@ returns `None` the default configuration is used.
 The configuration returned by `custom_spec()` only need to include the
 changed compared to the default configuration.
 
+Default folder discovery for linting and tests includes every `src` and
+`test` folder in the repository, including `custom_build_tools/src` and
+`custom_build_tools/test`. If those custom folders exist but are empty,
+exclude them in `custom_spec()` with `mypy_exclude_folders`,
+`flake8_exclude_folders`, `pylint_exclude_folders` and
+`pytest_exclude_folders` until they contain Python files.
+
 ### The build flow
 
 After getting the default or custom `BuildSpec` the main steps in the

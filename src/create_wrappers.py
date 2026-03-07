@@ -47,24 +47,29 @@ def _set_wrapper_permissions(wrapper_path: Path) -> None:
 CUSTOM_BUILD_TOOLS_SPEC_CONTENT = '''
 """Repository-specific build specification for common_build_tools."""
 
-from pathlib import Path
-import sys
 from typing import Optional
-
-_THIS_DIR = Path(__file__).resolve().parent
-_REPO_ROOT = _THIS_DIR.parent
-_COMMON_BUILD_TOOLS_SRC = _REPO_ROOT / 'common_build_tools' / 'src'
-_CUSTOM_BUILD_TOOLS_SRC = _THIS_DIR / 'src'
-sys.path.insert(0, str(_COMMON_BUILD_TOOLS_SRC))
-sys.path.insert(0, str(_CUSTOM_BUILD_TOOLS_SRC))
-# pylint: disable=wrong-import-position
-from build_spec import BuildSpec  # noqa: E402
+from build_spec import BuildSpec
 
 
 def custom_spec() -> Optional[BuildSpec]:
     """Return custom build spec for this repository."""
     return None
 '''
+
+CUSTOM_FOLDER_PLACEHOLDER_CONTENT = {
+    'src': '"""Placeholder package for custom build hooks."""\n',
+    'test': '"""Placeholder package for custom build tests."""\n',
+}
+
+
+def _create_placeholder_python_file(custom_folder_path: Path,
+                                    folder_name: str) -> None:
+    """Create a placeholder Python file in newly created custom folder."""
+    placeholder_path = custom_folder_path / '__init__.py'
+    placeholder_path.write_text(
+        CUSTOM_FOLDER_PLACEHOLDER_CONTENT[folder_name],
+        encoding='utf-8'
+    )
 
 
 def create_custom_folder_structure(root_path: Path) -> None:
@@ -76,6 +81,10 @@ def create_custom_folder_structure(root_path: Path) -> None:
         custom_build_tools_dir_path = custom_build_tools_path / folder_name
         if not custom_build_tools_dir_path.exists():
             custom_build_tools_dir_path.mkdir()
+            _create_placeholder_python_file(
+                custom_folder_path=custom_build_tools_dir_path,
+                folder_name=folder_name
+            )
     custom_spec_path: Path = custom_build_tools_path / 'custom_spec.py'
     if not custom_spec_path.exists():
         custom_spec_path.write_text(CUSTOM_BUILD_TOOLS_SPEC_CONTENT,

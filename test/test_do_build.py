@@ -44,6 +44,13 @@ def test_wheel_regex_for_package_matches_dash_and_underscore() -> None:
     assert pattern.match('other-1.0.0.whl') is None
 
 
+def test_wheel_regex_for_package_accepts_dash_input() -> None:
+    """Test wheel regex handles package name input that contains dash."""
+    pattern = do_build._wheel_regex_for_package('my-pkg')
+    assert pattern.match('my_pkg-1.0.0-py3-none-any.whl')
+    assert pattern.match('my-pkg-1.0.0-py3-none-any.whl')
+
+
 def test_find_wheel_returns_sorted_latest(tmp_path: Path) -> None:
     """Test _find_wheel returns lexicographically latest matching wheel."""
     dist_dir = tmp_path / 'dist'
@@ -436,3 +443,37 @@ def test_do_build_returns_pydoc_error_after_reports(
     monkeypatch.setattr(do_build, '_generate_reports', lambda **_kwargs: 0)
     assert do_build.do_build(build_spec=BuildSpec(),
                              build_information=info) == 2
+
+
+def test_do_build_logs_unhandled_exception_to_build_log(
+        monkeypatch: pytest.MonkeyPatch,
+        tmp_path: Path) -> None:
+    """Test unexpected exception traceback is appended to build log."""
+    info = make_build_information(tmp_path)
+
+    def _prepare(project_root: Path,
+                 build_information: BuildInformation) -> dict[str, Path]:
+        _ = project_root
+        _ = build_information
+        report_dir = tmp_path / 'reports'
+        report_dir.mkdir(exist_ok=True)
+        dist_dir = tmp_path / 'dist'
+        dist_dir.mkdir(exist_ok=True)
+        return _report_paths(report_dir, dist_dir)
+
+    def _raise_install(**_kwargs: object) -> int:
+        raise ValueError('install failed')
+
+    monkeypatch.setattr(do_build, 'resolve_target_python',
+                        lambda _python_name: ('python3.14', ['python3.14']))
+    monkeypatch.setattr(do_build, '_ensure_venv', lambda **_kwargs: None)
+    monkeypatch.setattr(do_build, '_prepare_directories', _prepare)
+    monkeypatch.setattr(do_build, '_build_packages', lambda **_kwargs: 0)
+    monkeypatch.setattr(do_build, '_install_packages', _raise_install)
+    with pytest.raises(ValueError, match='install failed'):
+        _ = do_build.do_build(build_spec=BuildSpec(), build_information=info)
+    build_log = tmp_path / 'reports' / do_build.BUILD_LOG_NAME
+    content = build_log.read_text(encoding='utf-8')
+    assert 'Unhandled exception' in content
+    assert 'Traceback' in content
+    assert 'ValueError: install failed' in content

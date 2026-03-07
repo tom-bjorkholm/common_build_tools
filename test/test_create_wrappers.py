@@ -31,6 +31,8 @@ def test_create_custom_folder_structure_preserves_existing_custom_spec(
     create_wrappers.create_custom_folder_structure(tmp_path)
     assert (custom_path / 'src').is_dir()
     assert (custom_path / 'test').is_dir()
+    assert (custom_path / 'src' / '__init__.py').is_file()
+    assert (custom_path / 'test' / '__init__.py').is_file()
     assert existing.read_text(encoding='utf-8') == 'ORIGINAL\n'
 
 
@@ -60,4 +62,7 @@ def test_create_wrappers_creates_all_files(
         assert f'from {target_name} import {target_name}_cmd' in content
     assert (tmp_path / 'custom_build_tools' / 'src').is_dir()
     assert (tmp_path / 'custom_build_tools' / 'test').is_dir()
+    assert (tmp_path / 'custom_build_tools' / 'src' / '__init__.py').is_file()
+    assert (tmp_path / 'custom_build_tools' / 'test' /
+            '__init__.py').is_file()
     assert (tmp_path / 'custom_build_tools' / 'custom_spec.py').is_file()

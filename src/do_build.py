@@ -12,6 +12,7 @@ import re
 import shutil
 import subprocess
 import sys
+import traceback
 from typing import NamedTuple, Optional
 
 from best_installed_python import resolve_target_python
@@ -181,7 +182,10 @@ def _build_packages(venv_cmd: list[str], build_information: BuildInformation,
 
 def _wheel_regex_for_package(package_name: str) -> re.Pattern[str]:
     """Return regex for wheel files of one package."""
-    escaped_name = re.escape(package_name).replace('_', '[-_]')
+    escaped_name = ''.join(
+        '[-_]' if char in '-_' else re.escape(char)
+        for char in package_name
+    )
     return re.compile(rf'^{escaped_name}-.*\.whl$')
 
 
@@ -594,6 +598,28 @@ def _restore_line_end_only_changes() -> list[Path]:
     )
 
 
+def _append_exception_traceback_to_build_log(
+        project_root: Path,
+        report_paths: Optional[dict[str, Path]]) -> None:
+    """Append traceback for unexpected do_build exceptions to build log."""
+    log_path: Optional[Path]
+    if report_paths is None:
+        log_path = project_root / REPORT_DIR_NAME / BUILD_LOG_NAME
+    else:
+        log_path = report_paths.get('build_log')
+    if log_path is None:
+        return
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(log_path, 'a', encoding='utf-8') as file_obj:
+        file_obj.write('\n')
+        file_obj.write(
+            datetime.now().astimezone().strftime(
+                'Unhandled exception %Y-%m-%d %H:%M:%S %Z\n'
+            )
+        )
+        file_obj.write(traceback.format_exc())
+
+
 def do_build(python_name: Optional[str] = None,
              build_spec: Optional[BuildSpec] = None,
              build_information: Optional[BuildInformation] = None) -> int:
@@ -606,6 +632,7 @@ def do_build(python_name: Optional[str] = None,
     project_root = active_information['project_root']
     repo_sync_warnings = get_repo_sync_warnings(project_root)
     _print_repo_sync_warnings(repo_sync_warnings=repo_sync_warnings)
+    report_paths: Optional[dict[str, Path]] = None
     try:
         _name, _python_cmd = resolve_target_python(python_name)
         _ensure_venv(
@@ -691,6 +718,12 @@ def do_build(python_name: Optional[str] = None,
         if pydoc_code != 0:
             return pydoc_code
         return report_code
+    except Exception:
+        _append_exception_traceback_to_build_log(
+            project_root=project_root,
+            report_paths=report_paths
+        )
+        raise
     finally:
         _print_repo_sync_warnings(
             repo_sync_warnings=repo_sync_warnings,
