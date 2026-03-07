@@ -182,9 +182,12 @@ def test_generate_reports_success_updates_readmes(
     result = do_build._generate_reports(
         build_information=info,
         report_paths=paths,
-        lint_codes={'mypy': 0, 'flake8': 0},
-        pytest_code=0,
-        venv_cmd=['venv/bin/python']
+        venv_cmd=['venv/bin/python'],
+        build_run_status=do_build.BuildRunStatus(
+            lint_codes={'mypy': 0, 'flake8': 0},
+            pytest_code=0
+        ),
+        repo_sync_warnings=[]
     )
     assert result == 0
     assert (report_dir / 'index.html').exists()
@@ -213,11 +216,52 @@ def test_generate_reports_returns_error_on_lint_failure(
     result = do_build._generate_reports(
         build_information=info,
         report_paths=paths,
-        lint_codes={'mypy': 1, 'flake8': 0},
-        pytest_code=0,
-        venv_cmd=['venv/bin/python']
+        venv_cmd=['venv/bin/python'],
+        build_run_status=do_build.BuildRunStatus(
+            lint_codes={'mypy': 1, 'flake8': 0},
+            pytest_code=0
+        ),
+        repo_sync_warnings=[]
     )
     assert result == 1
+
+
+def test_generate_reports_includes_repo_sync_warnings(
+        monkeypatch: pytest.MonkeyPatch,
+        tmp_path: Path) -> None:
+    """Test report generation writes repository sync warnings in html."""
+    info = make_build_information(tmp_path)
+    report_dir = tmp_path / 'reports'
+    report_dir.mkdir()
+    dist_dir = tmp_path / 'dist'
+    dist_dir.mkdir()
+    paths = _report_paths(report_dir, dist_dir)
+    paths['pytest_log'].write_text('=== 2 passed in 0.10s ===\n',
+                                   encoding='utf-8')
+    (paths['flake_dir'] / 'index.html').write_text('No flake8 errors found',
+                                                   encoding='utf-8')
+    paths['mypy_log'].write_text('Success: no issues found\n',
+                                 encoding='utf-8')
+    monkeypatch.setattr(do_build, '_get_python_version',
+                        lambda **_kwargs: 'Python')
+    warning_text = (
+        'Main repository: local branch master has 1 '
+        'unpushed commit(s) to origin/master.'
+    )
+    result = do_build._generate_reports(
+        build_information=info,
+        report_paths=paths,
+        venv_cmd=['venv/bin/python'],
+        build_run_status=do_build.BuildRunStatus(
+            lint_codes={'mypy': 0, 'flake8': 0},
+            pytest_code=0
+        ),
+        repo_sync_warnings=[warning_text]
+    )
+    assert result == 0
+    index_text = (report_dir / 'index.html').read_text(encoding='utf-8')
+    assert 'Repository synchronization warnings' in index_text
+    assert warning_text in index_text
 
 
 def test_do_build_calls_hooks_and_core_steps(
@@ -320,6 +364,42 @@ def test_do_build_calls_hooks_and_core_steps(
         'final',
         'reports',
     ]
+
+
+def test_do_build_prints_repo_sync_warnings_start_and_end(
+        monkeypatch: pytest.MonkeyPatch, tmp_path: Path,
+        capsys: pytest.CaptureFixture[str]) -> None:
+    """Test do_build prints repository sync warnings at start and end."""
+    info = make_build_information(tmp_path)
+
+    def _prepare(project_root: Path,
+                 build_information: BuildInformation) -> dict[str, Path]:
+        _ = project_root
+        _ = build_information
+        report_dir = tmp_path / 'reports'
+        report_dir.mkdir(exist_ok=True)
+        dist_dir = tmp_path / 'dist'
+        dist_dir.mkdir(exist_ok=True)
+        return _report_paths(report_dir, dist_dir)
+
+    warning_text = (
+        'Main repository: local branch master has 1 '
+        'unpushed commit(s) to origin/master.'
+    )
+    monkeypatch.setattr(do_build, 'get_repo_sync_warnings',
+                        lambda _project_root: [warning_text])
+    monkeypatch.setattr(do_build, 'resolve_target_python',
+                        lambda _python_name: ('python3.14', ['python3.14']))
+    monkeypatch.setattr(do_build, '_ensure_venv', lambda **_kwargs: None)
+    monkeypatch.setattr(do_build, '_prepare_directories', _prepare)
+    monkeypatch.setattr(do_build, '_build_packages', lambda **_kwargs: 2)
+    result = do_build.do_build(build_spec=BuildSpec(),
+                               build_information=info)
+    assert result == 2
+    out, err = capsys.readouterr()
+    assert out == ''
+    assert err.count('Repository synchronization warnings') == 2
+    assert err.count(warning_text) == 2
 
 
 def test_do_build_returns_pydoc_error_after_reports(

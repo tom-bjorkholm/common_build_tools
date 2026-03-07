@@ -5,6 +5,7 @@
 # MIT License
 
 from datetime import datetime
+import html
 import os
 from pathlib import Path
 import re
@@ -29,7 +30,7 @@ from build_utils import (
     venv_script,
 )
 from get_build_spec import get_build_spec
-from git_helpers import restore_bad_eol_changes
+from git_helpers import get_repo_sync_warnings, restore_bad_eol_changes
 from setup_build_environment import setup_build_environment
 
 
@@ -65,6 +66,14 @@ class ReportSummary(NamedTuple):
     flake8_clean: bool
     mypy_clean: bool
     python_version: str
+    repo_sync_warnings: list[str]
+
+
+class BuildRunStatus(NamedTuple):
+    """Exit status values needed when generating final build reports."""
+
+    lint_codes: dict[str, int]
+    pytest_code: int
 
 
 def _run_custom_hooks(hooks: Optional[list[CustomFunction]],
@@ -443,6 +452,21 @@ def _build_version_text(build_information: BuildInformation) -> str:
     return ', '.join(versions)
 
 
+def _print_repo_sync_warnings(repo_sync_warnings: list[str],
+                              at_build_end: bool = False) -> None:
+    """Print repository synchronization warnings to stderr."""
+    if not repo_sync_warnings:
+        return
+    if at_build_end:
+        phase_text = 'at build end'
+    else:
+        phase_text = 'at build start'
+    print(f'Repository synchronization warnings ({phase_text}):',
+          file=sys.stderr)
+    for warning_text in repo_sync_warnings:
+        print(f'  - {warning_text}', file=sys.stderr)
+
+
 def _write_html_report(build_information: BuildInformation,
                        report_paths: dict[str, Path],
                        report_summary: ReportSummary) -> None:
@@ -477,6 +501,13 @@ def _write_html_report(build_information: BuildInformation,
             file_obj.write('<p>No mypy errors found.</p>\n')
         else:
             file_obj.write('<p>mypy errors.</p>\n')
+        if report_summary.repo_sync_warnings:
+            file_obj.write('<h3>Repository synchronization warnings</h3>\n')
+            file_obj.write('<ul>\n')
+            for warning_text in report_summary.repo_sync_warnings:
+                escaped_warning = html.escape(warning_text)
+                file_obj.write(f'  <li>{escaped_warning}</li>\n')
+            file_obj.write('</ul>\n')
         file_obj.write(
             f'<p>Build and test using {report_summary.python_version}</p>\n'
         )
@@ -511,8 +542,9 @@ def _write_test_summary(report_paths: dict[str, Path],
 
 def _generate_reports(
         build_information: BuildInformation,
-        report_paths: dict[str, Path], lint_codes: dict[str, int],
-        pytest_code: int, venv_cmd: list[str]) -> int:
+        report_paths: dict[str, Path], venv_cmd: list[str],
+        build_run_status: BuildRunStatus,
+        repo_sync_warnings: list[str]) -> int:
     """Generate HTML/markdown reports and return final status code."""
     pytest_summary, skipped, pytest_failed = _parse_pytest_summary(
         report_paths['pytest_log']
@@ -530,6 +562,7 @@ def _generate_reports(
         flake8_clean=flake8_clean,
         mypy_clean=mypy_clean,
         python_version=python_version,
+        repo_sync_warnings=list(repo_sync_warnings),
     )
     _write_html_report(
         build_information=build_information,
@@ -543,8 +576,11 @@ def _generate_reports(
     if not skipped:
         _update_readmes(build_information=build_information,
                         summary_file=summary_file)
-    lint_failed = any(return_code != 0 for return_code in lint_codes.values())
-    if pytest_code != 0 or pytest_failed or lint_failed:
+    lint_failed = any(
+        return_code != 0
+        for return_code in build_run_status.lint_codes.values()
+    )
+    if build_run_status.pytest_code != 0 or pytest_failed or lint_failed:
         return 1
     return 0
 
@@ -568,84 +604,98 @@ def do_build(python_name: Optional[str] = None,
     if active_information is None:
         active_information = get_build_information(active_spec)
     project_root = active_information['project_root']
-    _name, _python_cmd = resolve_target_python(python_name)
-    _ensure_venv(
-        python_name=python_name,
-        project_root=project_root,
-        build_spec=active_spec,
-        build_information=active_information
-    )
-    venv_cmd = venv_python()
-    _run_custom_hooks(active_spec.custom_before_clean, active_spec,
-                      active_information)
-    report_paths = _prepare_directories(project_root=project_root,
-                                        build_information=active_information)
-    report_paths['build_log'].write_text(
-        datetime.now().astimezone().strftime(
-            'Build started %Y-%m-%d %H:%M:%S %Z\n'
-        ),
-        encoding='utf-8'
-    )
-    _run_custom_hooks(active_spec.custom_before_build, active_spec,
-                      active_information)
-    build_code = _build_packages(
-        venv_cmd=venv_cmd,
-        build_information=active_information,
-        build_log=report_paths['build_log'],
-        project_root=project_root
-    )
-    if build_code != 0:
-        return build_code
-    _run_custom_hooks(active_spec.custom_before_install, active_spec,
-                      active_information)
-    install_code = _install_packages(
-        venv_cmd=venv_cmd,
-        build_information=active_information,
-        build_log=report_paths['build_log'],
-        dist_dir=report_paths['dist_dir'],
-        project_root=project_root
-    )
-    if install_code != 0:
-        return install_code
-    _run_custom_hooks(active_spec.custom_before_test, active_spec,
-                      active_information)
-    lint_codes = _run_linters(
-        venv_cmd=venv_cmd,
-        build_information=active_information,
-        report_paths=report_paths,
-        project_root=project_root
-    )
-    pytest_code = _run_pytest(
-        venv_cmd=venv_cmd,
-        build_information=active_information,
-        pytest_log=report_paths['pytest_log'],
-        report_dir=report_paths['report_dir'],
-        project_root=project_root
-    )
-    _run_custom_hooks(active_spec.custom_after_test, active_spec,
-                      active_information)
-    pydoc_code = _run_pydoc_markdown(
-        venv_cmd=venv_cmd,
-        build_spec=active_spec,
-        build_log=report_paths['build_log'],
-        project_root=project_root
-    )
-    _run_custom_hooks(active_spec.custom_final, active_spec,
-                      active_information)
-    restored_files = _restore_line_end_only_changes()
-    if restored_files:
-        print(f'Restored {len(restored_files)} line-ending-only changes.',
-              file=sys.stderr)
-    report_code = _generate_reports(
-        build_information=active_information,
-        report_paths=report_paths,
-        lint_codes=lint_codes,
-        pytest_code=pytest_code,
-        venv_cmd=venv_cmd
-    )
-    if pydoc_code != 0:
-        return pydoc_code
-    return report_code
+    repo_sync_warnings = get_repo_sync_warnings(project_root)
+    _print_repo_sync_warnings(repo_sync_warnings=repo_sync_warnings)
+    try:
+        _name, _python_cmd = resolve_target_python(python_name)
+        _ensure_venv(
+            python_name=python_name,
+            project_root=project_root,
+            build_spec=active_spec,
+            build_information=active_information
+        )
+        venv_cmd = venv_python()
+        _run_custom_hooks(active_spec.custom_before_clean, active_spec,
+                          active_information)
+        report_paths = _prepare_directories(
+            project_root=project_root,
+            build_information=active_information
+        )
+        report_paths['build_log'].write_text(
+            datetime.now().astimezone().strftime(
+                'Build started %Y-%m-%d %H:%M:%S %Z\n'
+            ),
+            encoding='utf-8'
+        )
+        _run_custom_hooks(active_spec.custom_before_build, active_spec,
+                          active_information)
+        build_code = _build_packages(
+            venv_cmd=venv_cmd,
+            build_information=active_information,
+            build_log=report_paths['build_log'],
+            project_root=project_root
+        )
+        if build_code != 0:
+            return build_code
+        _run_custom_hooks(active_spec.custom_before_install, active_spec,
+                          active_information)
+        install_code = _install_packages(
+            venv_cmd=venv_cmd,
+            build_information=active_information,
+            build_log=report_paths['build_log'],
+            dist_dir=report_paths['dist_dir'],
+            project_root=project_root
+        )
+        if install_code != 0:
+            return install_code
+        _run_custom_hooks(active_spec.custom_before_test, active_spec,
+                          active_information)
+        lint_codes = _run_linters(
+            venv_cmd=venv_cmd,
+            build_information=active_information,
+            report_paths=report_paths,
+            project_root=project_root
+        )
+        pytest_code = _run_pytest(
+            venv_cmd=venv_cmd,
+            build_information=active_information,
+            pytest_log=report_paths['pytest_log'],
+            report_dir=report_paths['report_dir'],
+            project_root=project_root
+        )
+        _run_custom_hooks(active_spec.custom_after_test, active_spec,
+                          active_information)
+        pydoc_code = _run_pydoc_markdown(
+            venv_cmd=venv_cmd,
+            build_spec=active_spec,
+            build_log=report_paths['build_log'],
+            project_root=project_root
+        )
+        _run_custom_hooks(active_spec.custom_final, active_spec,
+                          active_information)
+        restored_files = _restore_line_end_only_changes()
+        if restored_files:
+            print(f'Restored {len(restored_files)} line-ending-only changes.',
+                  file=sys.stderr)
+        build_run_status = BuildRunStatus(
+            lint_codes=lint_codes,
+            pytest_code=pytest_code
+        )
+        report_code = _generate_reports(
+            build_information=active_information,
+            report_paths=report_paths,
+            venv_cmd=venv_cmd,
+            build_run_status=build_run_status,
+            repo_sync_warnings=repo_sync_warnings
+        )
+        if pydoc_code != 0:
+            return pydoc_code
+        return report_code
+    finally:
+        _print_repo_sync_warnings(
+            repo_sync_warnings=repo_sync_warnings,
+            at_build_end=True
+        )
 
 
 def do_build_cmd(build_spec: Optional[BuildSpec] = None,

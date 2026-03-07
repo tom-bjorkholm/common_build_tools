@@ -46,6 +46,37 @@ def _commit_all(repo_path: Path, message: str) -> None:
     _run_git(['commit', '-m', message], repo_path)
 
 
+def _init_bare_repo(base_path: Path, folder_name: str) -> Path:
+    """Create a bare git repository and return its path."""
+    bare_repo = base_path / folder_name
+    bare_repo.mkdir(parents=True, exist_ok=True)
+    _run_git(['init', '--bare'], bare_repo)
+    return bare_repo
+
+
+def _set_origin_and_push(repo_path: Path, origin_path: Path) -> None:
+    """Set origin remote and push current branch with tracking."""
+    branch_name = _run_git(['rev-parse', '--abbrev-ref', 'HEAD'], repo_path)
+    _run_git(['remote', 'add', 'origin', str(origin_path)], repo_path)
+    _run_git(['push', '-u', 'origin', branch_name], repo_path)
+
+
+def _clone_repo(remote_path: Path, clone_path: Path) -> None:
+    """Clone remote repo to clone path and configure commit identity."""
+    clone_path.parent.mkdir(parents=True, exist_ok=True)
+    result = subprocess.run(
+        ['git', 'clone', str(remote_path), str(clone_path)],
+        cwd=clone_path.parent,
+        text=True,
+        capture_output=True,
+        check=False
+    )
+    if result.returncode != 0:
+        raise RuntimeError(f'Git clone failed: {result.stderr}')
+    _run_git(['config', 'user.name', 'Test User'], clone_path)
+    _run_git(['config', 'user.email', 'test@example.com'], clone_path)
+
+
 def _create_repo_with_submodule(
         base_path: Path) -> tuple[Path, Path, Path, Path]:
     """Create a main repo and a local submodule with unstaged changes."""
@@ -239,3 +270,92 @@ def test_restore_bad_eol_changes_verbose_not_allowed(
         out, err = capsys.readouterr()
         assert out == ''
         assert 'Not allowed to convert path: skip.bin' in err
+
+
+def test_repo_sync_warnings_report_unpushed_commits() -> None:
+    """Test repo sync warnings report local commits that are not pushed."""
+    with TemporaryDirectory() as tmp_dir:
+        base_path = Path(tmp_dir)
+        repo_path = base_path / 'repo'
+        _init_repo(repo_path)
+        tracked_file = repo_path / 'tracked.txt'
+        tracked_file.write_text('line one\n', encoding='utf-8')
+        _commit_all(repo_path, 'initial commit')
+        origin_path = _init_bare_repo(base_path, 'origin_repo.git')
+        _set_origin_and_push(repo_path=repo_path, origin_path=origin_path)
+        tracked_file.write_text('line two\n', encoding='utf-8')
+        _commit_all(repo_path, 'local commit')
+        warnings_list = git_helpers.get_repo_sync_warnings(
+            project_root=repo_path,
+            timeout_seconds=5.0
+        )
+        assert any(
+            'unpushed commit(s)' in warning_text
+            for warning_text in warnings_list
+        )
+
+
+def test_repo_sync_warnings_report_remote_newer_commits() -> None:
+    """Test repo sync warnings report when remote has newer commit(s)."""
+    with TemporaryDirectory() as tmp_dir:
+        base_path = Path(tmp_dir)
+        repo_path = base_path / 'repo'
+        _init_repo(repo_path)
+        tracked_file = repo_path / 'tracked.txt'
+        tracked_file.write_text('line one\n', encoding='utf-8')
+        _commit_all(repo_path, 'initial commit')
+        origin_path = _init_bare_repo(base_path, 'origin_repo.git')
+        _set_origin_and_push(repo_path=repo_path, origin_path=origin_path)
+        updater_path = base_path / 'updater'
+        _clone_repo(remote_path=origin_path, clone_path=updater_path)
+        updater_file = updater_path / 'tracked.txt'
+        updater_file.write_text('line two\n', encoding='utf-8')
+        _commit_all(updater_path, 'remote commit')
+        _run_git(['push'], updater_path)
+        warnings_list = git_helpers.get_repo_sync_warnings(
+            project_root=repo_path,
+            timeout_seconds=5.0
+        )
+        assert any(
+            'newer commit(s) to pull.' in warning_text
+            for warning_text in warnings_list
+        )
+
+
+def test_get_repo_sync_warnings_reports_both_repositories() -> None:
+    """Test sync warnings include checks for main and common build tools."""
+    with TemporaryDirectory() as tmp_dir:
+        base_path = Path(tmp_dir)
+        project_root = base_path / 'project_root'
+        _init_repo(project_root)
+        root_file = project_root / 'root.txt'
+        root_file.write_text('root\n', encoding='utf-8')
+        _commit_all(project_root, 'initial main commit')
+        main_origin = _init_bare_repo(base_path, 'main_origin.git')
+        _set_origin_and_push(repo_path=project_root, origin_path=main_origin)
+        root_file.write_text('root changed\n', encoding='utf-8')
+        _commit_all(project_root, 'main local commit')
+        submodule_root = project_root / 'common_build_tools'
+        _init_repo(submodule_root)
+        submodule_file = submodule_root / 'tool.txt'
+        submodule_file.write_text('tool\n', encoding='utf-8')
+        _commit_all(submodule_root, 'initial submodule commit')
+        submodule_origin = _init_bare_repo(base_path, 'cbt_origin.git')
+        _set_origin_and_push(
+            repo_path=submodule_root,
+            origin_path=submodule_origin
+        )
+        submodule_file.write_text('tool changed\n', encoding='utf-8')
+        _commit_all(submodule_root, 'submodule local commit')
+        warnings_list = git_helpers.get_repo_sync_warnings(
+            project_root=project_root,
+            timeout_seconds=5.0
+        )
+        assert any(
+            warning_text.startswith('Main repository:')
+            for warning_text in warnings_list
+        )
+        assert any(
+            warning_text.startswith('common_build_tools repository:')
+            for warning_text in warnings_list
+        )
