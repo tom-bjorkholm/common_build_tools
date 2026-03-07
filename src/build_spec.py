@@ -69,7 +69,7 @@ class BuildSpec(NamedTuple):
     `setup.py` or `pyproject.toml`.
     """
 
-    identical_versions: bool = False
+    identical_versions: bool = True
     """If True all discovered packages must have the same version."""
 
     mypy_on_test: bool = False

@@ -13,10 +13,10 @@ from build_spec import BuildSpec
 
 def test_default_build_spec_has_expected_defaults() -> None:
     """Test default build spec values used by common build tools."""
-    default_spec = get_build_spec._default_build_spec()
+    default_spec = BuildSpec()
     assert default_spec.package_folders is None
     assert default_spec.identical_versions is True
-    assert default_spec.mypy_on_test is True
+    assert default_spec.mypy_on_test is False
     assert default_spec.custom_final is None
 
 

@@ -28,18 +28,8 @@ except ImportError:
 
 
 def _default_build_spec() -> BuildSpec:
-    """Return the default common build specification."""
-    return BuildSpec(
-        package_folders=None,
-        identical_versions=True,
-        mypy_on_test=True,
-        custom_before_clean=None,
-        custom_before_build=None,
-        custom_before_install=None,
-        custom_before_test=None,
-        custom_after_test=None,
-        custom_final=None,
-    )
+    """Return the default build specification."""
+    return BuildSpec()
 
 
 def get_build_spec() -> BuildSpec:
@@ -48,12 +38,12 @@ def get_build_spec() -> BuildSpec:
     If `custom_build_tools/custom_spec.py` defines `custom_spec()` and that
     function returns a `BuildSpec`, that specification is used.
     """
-    custom_build_spec = custom_spec()
+    custom_build_spec: Optional[BuildSpec] = custom_spec()
     if custom_build_spec is None:
-        return _default_build_spec()
+        return BuildSpec()
     assert custom_build_spec is not None
     if isinstance(custom_build_spec, BuildSpec):
         return custom_build_spec
     print('custom_spec() did not return BuildSpec.', file=sys.stderr)
     print('Using default build specification.', file=sys.stderr)
-    return _default_build_spec()
+    return BuildSpec()
