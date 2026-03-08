@@ -77,6 +77,17 @@ class BuildRunStatus(NamedTuple):
     pytest_code: int
 
 
+class ReportGenerationContext(NamedTuple):
+    """Inputs required for final report generation."""
+
+    build_information: BuildInformation
+    build_spec: BuildSpec
+    report_paths: dict[str, Path]
+    venv_cmd: list[str]
+    build_run_status: BuildRunStatus
+    repo_sync_warnings: list[str]
+
+
 def _run_custom_hooks(hooks: Optional[list[CustomFunction]],
                       build_spec: BuildSpec,
                       build_information: BuildInformation) -> None:
@@ -372,22 +383,30 @@ def _run_pydoc_markdown(venv_cmd: list[str], build_spec: BuildSpec,
     return 0
 
 
-def _parse_pytest_summary(pytest_log: Path) -> tuple[str, bool, bool]:
-    """Parse pytest summary line from log file."""
+def _parse_pytest_summary(pytest_log: Path) -> tuple[str, int, bool]:
+    """Parse pytest summary line from log file.
+
+    Return tuple of (summary text, number of skipped tests, boolean failed).
+    """
     if not pytest_log.exists():
-        return '', False, False
+        return '', 0, False
     last_summary = ''
     with open(pytest_log, encoding='utf-8') as file_obj:
         for line in file_obj:
             if (' passed' in line or ' failed' in line or
-                    ' error' in line):
+                    ' error' in line or ' skipped' in line):
                 last_summary = line
     if not last_summary:
-        return '', False, False
+        return '', 0, False
     cleaned = last_summary.replace('=', '').strip()
     cleaned = re.sub(r'\.\d\ds', 's', cleaned)
-    return cleaned, ('skipped' in last_summary), ('failed' in last_summary or
-                                                  'error' in last_summary)
+    skipped_count = sum(
+        int(count_text)
+        for count_text in re.findall(r'(\d+)\s+skipped\b', last_summary)
+    )
+    return cleaned, skipped_count, (
+        'failed' in last_summary or 'error' in last_summary
+    )
 
 
 def _check_flake8_clean(report_paths: dict[str, Path]) -> bool:
@@ -544,21 +563,19 @@ def _write_test_summary(report_paths: dict[str, Path],
     return summary_file
 
 
-def _generate_reports(
-        build_information: BuildInformation,
-        report_paths: dict[str, Path], venv_cmd: list[str],
-        build_run_status: BuildRunStatus,
-        repo_sync_warnings: list[str]) -> int:
+def _generate_reports(report_context: ReportGenerationContext) -> int:
     """Generate HTML/markdown reports and return final status code."""
+    if report_context.build_spec.readme_summary_max_skipped < 0:
+        raise ValueError('readme_summary_max_skipped must be non-negative.')
     pytest_summary, skipped, pytest_failed = _parse_pytest_summary(
-        report_paths['pytest_log']
+        report_context.report_paths['pytest_log']
     )
-    flake8_clean = _check_flake8_clean(report_paths)
-    mypy_clean = _check_mypy_clean(report_paths)
-    version_text = _build_version_text(build_information)
+    flake8_clean = _check_flake8_clean(report_context.report_paths)
+    mypy_clean = _check_mypy_clean(report_context.report_paths)
+    version_text = _build_version_text(report_context.build_information)
     python_version = _get_python_version(
-        venv_cmd=venv_cmd,
-        project_root=build_information['project_root']
+        venv_cmd=report_context.venv_cmd,
+        project_root=report_context.build_information['project_root']
     )
     report_summary = ReportSummary(
         version_text=version_text,
@@ -566,25 +583,26 @@ def _generate_reports(
         flake8_clean=flake8_clean,
         mypy_clean=mypy_clean,
         python_version=python_version,
-        repo_sync_warnings=list(repo_sync_warnings),
+        repo_sync_warnings=list(report_context.repo_sync_warnings),
     )
     _write_html_report(
-        build_information=build_information,
-        report_paths=report_paths,
+        build_information=report_context.build_information,
+        report_paths=report_context.report_paths,
         report_summary=report_summary
     )
     summary_file = _write_test_summary(
-        report_paths=report_paths,
+        report_paths=report_context.report_paths,
         report_summary=report_summary
     )
-    if not skipped:
-        _update_readmes(build_information=build_information,
+    if skipped <= report_context.build_spec.readme_summary_max_skipped:
+        _update_readmes(build_information=report_context.build_information,
                         summary_file=summary_file)
     lint_failed = any(
         return_code != 0
-        for return_code in build_run_status.lint_codes.values()
+        for return_code in report_context.build_run_status.lint_codes.values()
     )
-    if build_run_status.pytest_code != 0 or pytest_failed or lint_failed:
+    if (report_context.build_run_status.pytest_code != 0 or
+            pytest_failed or lint_failed):
         return 1
     return 0
 
@@ -708,13 +726,15 @@ def do_build(python_name: Optional[str] = None,
             lint_codes=lint_codes,
             pytest_code=pytest_code
         )
-        report_code = _generate_reports(
+        report_context = ReportGenerationContext(
             build_information=active_information,
+            build_spec=active_spec,
             report_paths=report_paths,
             venv_cmd=venv_cmd,
             build_run_status=build_run_status,
             repo_sync_warnings=repo_sync_warnings
         )
+        report_code = _generate_reports(report_context=report_context)
         if pydoc_code != 0:
             return pydoc_code
         return report_code

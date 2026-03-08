@@ -75,6 +75,9 @@ class BuildSpec(NamedTuple):
     mypy_on_test: bool = True
     """If True run mypy also on discovered `test` folders."""
 
+    readme_summary_max_skipped: int = 0
+    """Update test summary in README if skipped tests <= this value."""
+
     custom_before_clean: Optional[list[CustomFunction]] = None
     """Custom hooks run before cleaning build artifacts."""
 

@@ -36,6 +36,35 @@ def _report_paths(report_dir: Path, dist_dir: Path) -> dict[str, Path]:
     }
 
 
+def _report_context(
+        build_information: BuildInformation,
+        report_paths: dict[str, Path],
+        readme_summary_max_skipped: int = 0,
+        lint_codes: dict[str, int] | None = None,
+        repo_sync_warnings: list[str] | None = None
+) -> do_build.ReportGenerationContext:
+    """Create report context used by do_build report generation tests."""
+    resolved_lint_codes = {'mypy': 0, 'flake8': 0}
+    if lint_codes is not None:
+        resolved_lint_codes = lint_codes
+    resolved_repo_sync_warnings: list[str] = []
+    if repo_sync_warnings is not None:
+        resolved_repo_sync_warnings = repo_sync_warnings
+    return do_build.ReportGenerationContext(
+        build_information=build_information,
+        build_spec=BuildSpec(
+            readme_summary_max_skipped=readme_summary_max_skipped
+        ),
+        report_paths=report_paths,
+        venv_cmd=['venv/bin/python'],
+        build_run_status=do_build.BuildRunStatus(
+            lint_codes=resolved_lint_codes,
+            pytest_code=0
+        ),
+        repo_sync_warnings=resolved_repo_sync_warnings,
+    )
+
+
 def test_wheel_regex_for_package_matches_dash_and_underscore() -> None:
     """Test wheel regex accepts dash and underscore package name variants."""
     pattern = do_build._wheel_regex_for_package('my_pkg')
@@ -120,7 +149,7 @@ def test_parse_pytest_summary_extracts_latest(tmp_path: Path) -> None:
     )
     summary, skipped, failed = do_build._parse_pytest_summary(log_file)
     assert summary == '2 failed, 10 passed in 1s'
-    assert skipped is False
+    assert skipped == 0
     assert failed is True
 
 
@@ -130,7 +159,21 @@ def test_parse_pytest_summary_handles_missing_file(tmp_path: Path) -> None:
         tmp_path / 'missing.log'
     )
     assert summary == ''
-    assert skipped is False
+    assert skipped == 0
+    assert failed is False
+
+
+def test_parse_pytest_summary_extracts_skipped_count(tmp_path: Path) -> None:
+    """Test pytest summary parser extracts numeric skipped count."""
+    log_file = tmp_path / 'pytest_log.txt'
+    log_file.write_text(
+        'line one\n'
+        '===== 10 passed, 4 skipped in 1.23s =====\n',
+        encoding='utf-8'
+    )
+    summary, skipped, failed = do_build._parse_pytest_summary(log_file)
+    assert summary == '10 passed, 4 skipped in 1s'
+    assert skipped == 4
     assert failed is False
 
 
@@ -187,14 +230,10 @@ def test_generate_reports_success_updates_readmes(
     monkeypatch.setattr(do_build, '_get_python_version',
                         lambda **_kwargs: 'Python')
     result = do_build._generate_reports(
-        build_information=info,
-        report_paths=paths,
-        venv_cmd=['venv/bin/python'],
-        build_run_status=do_build.BuildRunStatus(
-            lint_codes={'mypy': 0, 'flake8': 0},
-            pytest_code=0
-        ),
-        repo_sync_warnings=[]
+        report_context=_report_context(
+            build_information=info,
+            report_paths=paths
+        )
     )
     assert result == 0
     assert (report_dir / 'index.html').exists()
@@ -221,14 +260,11 @@ def test_generate_reports_returns_error_on_lint_failure(
     monkeypatch.setattr(do_build, '_get_python_version',
                         lambda **_kwargs: 'Python')
     result = do_build._generate_reports(
-        build_information=info,
-        report_paths=paths,
-        venv_cmd=['venv/bin/python'],
-        build_run_status=do_build.BuildRunStatus(
-            lint_codes={'mypy': 1, 'flake8': 0},
-            pytest_code=0
-        ),
-        repo_sync_warnings=[]
+        report_context=_report_context(
+            build_information=info,
+            report_paths=paths,
+            lint_codes={'mypy': 1, 'flake8': 0}
+        )
     )
     assert result == 1
 
@@ -256,19 +292,81 @@ def test_generate_reports_includes_repo_sync_warnings(
         'unpushed commit(s) to origin/master.'
     )
     result = do_build._generate_reports(
-        build_information=info,
-        report_paths=paths,
-        venv_cmd=['venv/bin/python'],
-        build_run_status=do_build.BuildRunStatus(
-            lint_codes={'mypy': 0, 'flake8': 0},
-            pytest_code=0
-        ),
-        repo_sync_warnings=[warning_text]
+        report_context=_report_context(
+            build_information=info,
+            report_paths=paths,
+            repo_sync_warnings=[warning_text]
+        )
     )
     assert result == 0
     index_text = (report_dir / 'index.html').read_text(encoding='utf-8')
     assert 'Repository synchronization warnings' in index_text
     assert warning_text in index_text
+
+
+def test_generate_reports_skipped_over_limit_keeps_readmes_unchanged(
+        monkeypatch: pytest.MonkeyPatch,
+        tmp_path: Path) -> None:
+    """Test README summary update is skipped when skipped count is too high."""
+    package_folder = tmp_path / 'pkg-one'
+    package_folder.mkdir(parents=True, exist_ok=True)
+    package = make_package_information(
+        package_folder=package_folder,
+        name='pkg-one'
+    )
+    package_readme = package['package_folder'] / 'README_pypi.md'
+    package_readme.write_text('# package\n', encoding='utf-8')
+    root_readme = tmp_path / 'README.md'
+    root_readme.write_text('# root\n', encoding='utf-8')
+    info = make_build_information(tmp_path, [package])
+    report_dir = tmp_path / 'reports'
+    report_dir.mkdir()
+    dist_dir = tmp_path / 'dist'
+    dist_dir.mkdir()
+    paths = _report_paths(report_dir, dist_dir)
+    paths['pytest_log'].write_text(
+        '=== 5 passed, 4 skipped in 2.11s ===\n',
+        encoding='utf-8'
+    )
+    paths['mypy_log'].write_text('Success: no issues found\n',
+                                 encoding='utf-8')
+    (paths['flake_dir'] / 'index.html').write_text(
+        'No flake8 errors found',
+        encoding='utf-8'
+    )
+    monkeypatch.setattr(do_build, '_get_python_version',
+                        lambda **_kwargs: 'Python')
+    result = do_build._generate_reports(
+        report_context=_report_context(
+            build_information=info,
+            report_paths=paths,
+            readme_summary_max_skipped=3
+        )
+    )
+    assert result == 0
+    assert '## Test summary' not in root_readme.read_text(encoding='utf-8')
+    assert '## Test summary' not in package_readme.read_text(encoding='utf-8')
+
+
+def test_generate_reports_raises_on_negative_skipped_limit(
+        tmp_path: Path) -> None:
+    """Test invalid negative README skipped threshold raises ValueError."""
+    info = make_build_information(tmp_path)
+    report_dir = tmp_path / 'reports'
+    report_dir.mkdir()
+    dist_dir = tmp_path / 'dist'
+    dist_dir.mkdir()
+    paths = _report_paths(report_dir, dist_dir)
+    with pytest.raises(
+            ValueError,
+            match='readme_summary_max_skipped must be non-negative'):
+        _ = do_build._generate_reports(
+            report_context=_report_context(
+                build_information=info,
+                report_paths=paths,
+                readme_summary_max_skipped=-1
+            )
+        )
 
 
 def test_do_build_calls_hooks_and_core_steps(
