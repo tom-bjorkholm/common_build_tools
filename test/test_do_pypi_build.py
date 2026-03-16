@@ -14,7 +14,7 @@ from build_spec import BuildSpec
 from common_build_tools.test.helpers import make_build_information
 
 
-def test_run_clean_build_or_fail_returns_error_code(
+def test_clean_fail_returns_code(
         monkeypatch: pytest.MonkeyPatch,
         tmp_path: Path,
         capsys: pytest.CaptureFixture[str]) -> None:
@@ -33,7 +33,7 @@ def test_run_clean_build_or_fail_returns_error_code(
     assert 'First run failed with exit code 4.' in captured.err
 
 
-def test_do_pypi_build_stops_after_first_failed_clean_build(
+def test_pypi_build_stops_on_fail(
         monkeypatch: pytest.MonkeyPatch,
         tmp_path: Path) -> None:
     """Test do_pypi_build returns first non-zero clean_build result."""
@@ -49,7 +49,7 @@ def test_do_pypi_build_stops_after_first_failed_clean_build(
     assert result == 2
 
 
-def test_do_pypi_build_without_twine_upload(
+def test_pypi_build_no_upload(
         monkeypatch: pytest.MonkeyPatch,
         tmp_path: Path,
         capsys: pytest.CaptureFixture[str]) -> None:
@@ -68,7 +68,7 @@ def test_do_pypi_build_without_twine_upload(
     assert 'Twine upload not done as it was not requested.' in captured.out
 
 
-def test_do_pypi_build_with_twine_upload_runs_command(
+def test_pypi_build_runs_upload(
         monkeypatch: pytest.MonkeyPatch,
         tmp_path: Path) -> None:
     """Test do_pypi_build runs twine upload command when requested."""
@@ -101,7 +101,7 @@ def test_do_pypi_build_with_twine_upload_runs_command(
     assert str(dist_dir / 'package_b.whl') in upload_cmd
 
 
-def test_do_pypi_build_cmd_parses_args_and_exits(
+def test_pypi_build_cmd_exits(
         monkeypatch: pytest.MonkeyPatch) -> None:
     """Test do_pypi_build_cmd parses command line arguments and exits."""
     monkeypatch.setattr(do_pypi_build, 'extract_python_name',

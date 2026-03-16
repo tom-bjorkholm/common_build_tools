@@ -335,6 +335,9 @@ def _pytest_command(venv_cmd: list[str], build_information: BuildInformation,
         '--pylint',
         f'--pylint-output-file={report_dir / PYLINT_LOG_NAME}',
     ])
+    pylint_rcfile = report_dir.parent / '.pylintrc'
+    if pylint_rcfile.is_file():
+        command.append(f'--pylint-rcfile={pylint_rcfile}')
     for package_data in build_information['package_information']:
         command.append(f'--cov={package_data["normalized_name"]}')
     return command
@@ -616,7 +619,7 @@ def _restore_line_end_only_changes() -> list[Path]:
     )
 
 
-def _append_exception_traceback_to_build_log(
+def _append_traceback_to_build_log(
         project_root: Path,
         report_paths: Optional[dict[str, Path]]) -> None:
     """Append traceback for unexpected do_build exceptions to build log."""
@@ -652,7 +655,7 @@ def do_build(python_name: Optional[str] = None,
     _print_repo_sync_warnings(repo_sync_warnings=repo_sync_warnings)
     report_paths: Optional[dict[str, Path]] = None
     try:
-        _name, _python_cmd = resolve_target_python(python_name)
+        resolve_target_python(python_name)
         _ensure_venv(
             python_name=python_name,
             project_root=project_root,
@@ -739,7 +742,7 @@ def do_build(python_name: Optional[str] = None,
             return pydoc_code
         return report_code
     except Exception:
-        _append_exception_traceback_to_build_log(
+        _append_traceback_to_build_log(
             project_root=project_root,
             report_paths=report_paths
         )

@@ -150,7 +150,7 @@ def setup_build_environment(python_name: str | None = None,
     if active_information is None:
         active_information = get_build_information(active_spec)
     exit_if_in_virtualenv('set up build environment')
-    _name, python_cmd = resolve_target_python(python_name)
+    python_cmd = resolve_target_python(python_name)[1]
     _install_global_packages(python_cmd)
     _create_or_recreate_venv(python_cmd, force_recreate=force_recreate)
     _install_venv_packages(active_spec, active_information)

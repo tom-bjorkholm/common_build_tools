@@ -26,7 +26,7 @@ def clean_build(python_name: Optional[str] = None,
     if active_information is None:
         active_information = get_build_information(active_spec)
     exit_if_in_virtualenv('delete virtual environment')
-    resolved_name, _cmd = resolve_target_python(python_name)
+    resolved_name = resolve_target_python(python_name)[0]
     clean(build_spec=active_spec, build_information=active_information)
     setup_build_environment(
         python_name=resolved_name,

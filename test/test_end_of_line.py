@@ -57,7 +57,7 @@ def test_dos2unix_fix_extra_cr_seq() -> None:
         assert file_path.read_bytes() == b'a\nb\nc\n'
 
 
-def test_dos2unix_every_cr_is_new_line() -> None:
+def test_dos2unix_cr_as_newline() -> None:
     """Test dos2unix conversion of standalone CR when enabled."""
     with TemporaryDirectory() as tmp_dir:
         file_path = Path(tmp_dir) / 'legacy.txt'
@@ -66,7 +66,7 @@ def test_dos2unix_every_cr_is_new_line() -> None:
         assert file_path.read_bytes() == b'a\nb\nc\n'
 
 
-def test_unix2dos_keeps_existing_crlf() -> None:
+def test_unix2dos_keeps_crlf() -> None:
     """Test unix2dos converts LF without duplicating CR in CRLF."""
     with TemporaryDirectory() as tmp_dir:
         file_path = Path(tmp_dir) / 'source.txt'
@@ -75,7 +75,7 @@ def test_unix2dos_keeps_existing_crlf() -> None:
         assert file_path.read_bytes() == b'a\r\nb\r\nc\rd\r\n'
 
 
-def test_eol_command_dos2unix_success() -> None:
+def test_eol_cmd_dos2unix() -> None:
     """Test eol_command successful dos2unix conversion."""
     with TemporaryDirectory() as tmp_dir:
         source_path = Path(tmp_dir) / 'source.txt'
@@ -85,7 +85,7 @@ def test_eol_command_dos2unix_success() -> None:
         assert source_path.read_bytes() == b'a\nb\n'
 
 
-def test_eol_command_unix2dos_target_file() -> None:
+def test_eol_cmd_unix2dos_target() -> None:
     """Test eol_command unix2dos conversion to target file."""
     with TemporaryDirectory() as tmp_dir:
         source_path = Path(tmp_dir) / 'source.txt'
@@ -112,7 +112,7 @@ def test_eol_command_missing_file(capsys: pytest.CaptureFixture[str]) -> None:
     assert 'Error:' in err
 
 
-def test_eol_command_invalid_arguments(
+def test_eol_cmd_bad_args(
         capsys: pytest.CaptureFixture[str]) -> None:
     """Test eol_command returns failure for invalid arguments."""
     exit_code = eol_command(['not-a-command'])

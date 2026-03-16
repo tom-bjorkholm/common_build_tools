@@ -28,7 +28,7 @@ IGNORED_SCAN_DIRS = {
 }
 
 
-def _project_root_from_common_build_tools() -> Path:
+def _project_root_from_tools() -> Path:
     """Return repository root from common_build_tools/src location."""
     return Path(__file__).resolve().parents[2]
 
@@ -174,7 +174,7 @@ def _parse_pyproject_file(pyproject_path: Path) -> dict[str, Any]:
     }
 
 
-def _check_consistency_between_setup_and_pyproject(
+def _check_setup_pyproject_match(
         package_folder: Path, setup_data: dict[str, Any],
         pyproject_data: dict[str, Any]) -> None:
     """Raise ValueError if setup.py and pyproject.toml disagree."""
@@ -213,7 +213,7 @@ def _combine_package_data(
     if pyproject_file is not None:
         pyproject_data = _parse_pyproject_file(pyproject_file)
     if setup_file is not None and pyproject_file is not None:
-        _check_consistency_between_setup_and_pyproject(
+        _check_setup_pyproject_match(
             package_folder=package_folder,
             setup_data=setup_data,
             pyproject_data=pyproject_data
@@ -292,7 +292,7 @@ def _extract_minimum_version(requirement: str) -> Optional[str]:
     return best
 
 
-def _check_internal_dependency_versions(
+def _check_dep_versions(
         package_information: list[PackageInformation]) -> None:
     """Check that internal dependencies specify >= built package version."""
     by_name = {
@@ -342,7 +342,7 @@ def _check_identical_versions(build_spec: BuildSpec,
         )
 
 
-def _dependency_edges_for_internal_packages(
+def _dep_edges_for_packages(
         package_information: list[PackageInformation]) -> \
             dict[str, list[str]]:
     """Return graph edges dependency -> dependent for internal packages."""
@@ -367,7 +367,7 @@ def _dependency_edges_for_internal_packages(
 def _package_install_order(package_information: list[PackageInformation]) -> \
         list[str]:
     """Return package install order based on internal dependencies."""
-    graph = _dependency_edges_for_internal_packages(package_information)
+    graph = _dep_edges_for_packages(package_information)
     indegree: dict[str, int] = {name: 0 for name in graph}
     by_name = {
         package_data['normalized_name']: package_data
@@ -399,7 +399,7 @@ def _collect_named_folders(project_root: Path, folder_name: str) -> list[Path]:
     """Collect folders in project tree with exact folder_name."""
     discovered: list[Path] = []
     seen: set[Path] = set()
-    for dir_path, dir_names, _file_names in os.walk(project_root):
+    for dir_path, dir_names, _ in os.walk(project_root):
         dir_names[:] = [
             name for name in dir_names
             if name not in IGNORED_SCAN_DIRS and not name.startswith('.')
@@ -471,7 +471,7 @@ def discover_build_information(build_spec: BuildSpec,
                                project_root: Optional[Path] = None) -> \
         BuildInformation:
     """Discover packages and tool folders and validate build consistency."""
-    resolved_root = (project_root or _project_root_from_common_build_tools()) \
+    resolved_root = (project_root or _project_root_from_tools()) \
         .resolve()
     package_folders = _resolve_package_folders(build_spec=build_spec,
                                                project_root=resolved_root)
@@ -480,9 +480,7 @@ def discover_build_information(build_spec: BuildSpec,
     ]
     _check_identical_versions(build_spec=build_spec,
                               package_information=package_information)
-    _check_internal_dependency_versions(
-        package_information=package_information
-    )
+    _check_dep_versions(package_information=package_information)
     install_order = _package_install_order(package_information)
     src_folders = _collect_named_folders(project_root=resolved_root,
                                          folder_name='src')

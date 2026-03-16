@@ -16,7 +16,7 @@ from common_build_tools.test.helpers import (
 )
 
 
-def test_clean_removes_common_artifacts(
+def test_clean_removes_artifacts(
         monkeypatch: pytest.MonkeyPatch,
         tmp_path: Path) -> None:
     """Test clean removes root and package build artifacts."""
@@ -52,7 +52,7 @@ def test_clean_removes_common_artifacts(
     assert not (package_folder / 'dist').exists()
 
 
-def test_remove_matching_removes_files_and_directories(tmp_path: Path) -> None:
+def test_remove_matching_paths(tmp_path: Path) -> None:
     """Test _remove_matching removes both directories and file matches."""
     (tmp_path / 'a' / '__pycache__').mkdir(parents=True)
     (tmp_path / 'b').mkdir(parents=True)

@@ -31,7 +31,7 @@ def _package_data(name: str, version: str,
     )
 
 
-def test_discover_package_folders_ignores_venv(tmp_path: Path) -> None:
+def test_discover_pkgs_skips_venv(tmp_path: Path) -> None:
     """Test auto-discovery ignores excluded folders like venv."""
     _write_text(tmp_path / 'pkg' / 'setup.py', 'from setuptools import setup')
     _write_text(
@@ -42,7 +42,7 @@ def test_discover_package_folders_ignores_venv(tmp_path: Path) -> None:
     assert discovered == [(tmp_path / 'pkg').resolve()]
 
 
-def test_parse_setup_file_reads_literal_assignments(tmp_path: Path) -> None:
+def test_parse_setup_reads_literals(tmp_path: Path) -> None:
     """Test setup.py parser resolves literal-assigned metadata values."""
     setup_path = tmp_path / 'setup.py'
     _write_text(
@@ -63,7 +63,7 @@ def test_parse_setup_file_reads_literal_assignments(tmp_path: Path) -> None:
     assert parsed['dependencies'] == ['dep>=1.0', 'dep-two==2.0']
 
 
-def test_parse_setup_file_raises_without_setup_call(tmp_path: Path) -> None:
+def test_parse_setup_needs_call(tmp_path: Path) -> None:
     """Test setup.py parser fails when no setup(...) call exists."""
     setup_path = tmp_path / 'setup.py'
     _write_text(setup_path, 'VALUE = 1\n')
@@ -71,7 +71,7 @@ def test_parse_setup_file_raises_without_setup_call(tmp_path: Path) -> None:
         _ = build_information._parse_setup_file(setup_path)
 
 
-def test_parse_pyproject_file_dynamic_dependencies(tmp_path: Path) -> None:
+def test_parse_pyproject_dyn_deps(tmp_path: Path) -> None:
     """Test pyproject parser returns None for dynamic dependencies."""
     pyproject_path = tmp_path / 'pyproject.toml'
     _write_text(
@@ -87,7 +87,7 @@ def test_parse_pyproject_file_dynamic_dependencies(tmp_path: Path) -> None:
     assert parsed['dependencies'] is None
 
 
-def test_check_consistency_between_setup_and_pyproject_raises() -> None:
+def test_setup_pyproject_mismatch() -> None:
     """Test mismatch between setup.py and pyproject.toml raises ValueError."""
     setup_data = {
         'name': 'pkg-a',
@@ -104,14 +104,14 @@ def test_check_consistency_between_setup_and_pyproject_raises() -> None:
         'dependencies': ['dep>=1.0'],
     }
     with pytest.raises(ValueError, match='Inconsistent version'):
-        build_information._check_consistency_between_setup_and_pyproject(
+        build_information._check_setup_pyproject_match(
             package_folder=Path('/tmp/pkg'),
             setup_data=setup_data,
             pyproject_data=pyproject_data
         )
 
 
-def test_combine_package_data_detects_src_and_test(tmp_path: Path) -> None:
+def test_combine_pkg_data_dirs(tmp_path: Path) -> None:
     """Test combined package data includes detected src and test folders."""
     package_folder = tmp_path / 'pkg'
     (package_folder / 'src').mkdir(parents=True)
@@ -142,26 +142,26 @@ def test_combine_package_data_detects_src_and_test(tmp_path: Path) -> None:
     assert combined['test_folder'] == (package_folder / 'test')
 
 
-def test_check_internal_dependency_versions_requires_minimum() -> None:
+def test_dep_versions_need_min() -> None:
     """Test internal dependencies must include >= minimum version specifier."""
     packages = [
         _package_data('pkg-a', '1.2.0', []),
         _package_data('pkg-b', '1.2.0', ['pkg-a==1.2.0']),
     ]
     with pytest.raises(ValueError, match='without >= version constraint'):
-        build_information._check_internal_dependency_versions(packages)
+        build_information._check_dep_versions(packages)
 
 
-def test_check_internal_dependency_versions_accepts_minimum() -> None:
+def test_dep_versions_accept_min() -> None:
     """Test internal dependency checks pass with valid minimum versions."""
     packages = [
         _package_data('pkg-a', '1.2.0', []),
         _package_data('pkg-b', '1.2.0', ['pkg-a>=1.2.0']),
     ]
-    build_information._check_internal_dependency_versions(packages)
+    build_information._check_dep_versions(packages)
 
 
-def test_package_install_order_respects_dependencies() -> None:
+def test_install_order_uses_deps() -> None:
     """Test install order puts dependency packages before dependents."""
     packages = [
         _package_data('pkg-base', '1.0.0', []),
@@ -171,7 +171,7 @@ def test_package_install_order_respects_dependencies() -> None:
     assert install_order == ['pkg-base', 'pkg-app']
 
 
-def test_package_install_order_detects_cycles() -> None:
+def test_install_order_has_cycle() -> None:
     """Test cycle detection in internal package dependency graph."""
     packages = [
         _package_data('pkg-a', '1.0.0', ['pkg-b>=1.0.0']),
@@ -181,7 +181,7 @@ def test_package_install_order_detects_cycles() -> None:
         _ = build_information._package_install_order(packages)
 
 
-def test_discover_build_information_full_project(tmp_path: Path) -> None:
+def test_discover_build_info_repo(tmp_path: Path) -> None:
     """Test discover_build_information on a temporary multi-package repo."""
     package_base = tmp_path / 'pkg_base'
     package_app = tmp_path / 'pkg_app'
@@ -226,7 +226,7 @@ def test_discover_build_information_full_project(tmp_path: Path) -> None:
         discovered['mypy_path_folders']
 
 
-def test_get_build_information_uses_provided_spec(
+def test_get_build_info_uses_spec(
         monkeypatch: pytest.MonkeyPatch,
         tmp_path: Path) -> None:
     """Test get_build_information forwards explicit build spec unchanged."""

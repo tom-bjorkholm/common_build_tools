@@ -16,7 +16,7 @@ from common_build_tools.test.helpers import (
 )
 
 
-def test_dynamic_package_dependencies_skips_internal_and_duplicates() -> None:
+def test_dyn_deps_skip_internal() -> None:
     """Test dynamic package list excludes internal and deduplicates entries."""
     info = make_build_information(
         project_root=Path('/tmp/project'),
@@ -37,7 +37,7 @@ def test_dynamic_package_dependencies_skips_internal_and_duplicates() -> None:
     assert dependencies == ['requests>=2.0', 'typing-extensions']
 
 
-def test_additional_venv_packages_strips_whitespace() -> None:
+def test_additional_venv_strips_ws() -> None:
     """Test additional venv packages remove empty and whitespace-only items."""
     spec = BuildSpec(additional_venv_packages=['  extra-one ', ' ', 'extra2'])
     assert setup_build_environment._additional_venv_packages(spec) == [
@@ -46,7 +46,7 @@ def test_additional_venv_packages_strips_whitespace() -> None:
     ]
 
 
-def test_venv_install_list_combines_all_sources() -> None:
+def test_venv_install_list_sources() -> None:
     """Test venv install list merges base, dynamic, custom and pinned sets."""
     spec = BuildSpec(additional_venv_packages=['extra-package'])
     info = make_build_information(
@@ -66,7 +66,7 @@ def test_venv_install_list_combines_all_sources() -> None:
     assert install_list[-1] == 'twine==6.0.1'
 
 
-def test_setup_build_environment_runs_expected_steps(
+def test_setup_env_runs_steps(
         monkeypatch: pytest.MonkeyPatch) -> None:
     """Test setup_build_environment orchestrates helper calls in sequence."""
     events: list[str] = []
@@ -109,7 +109,7 @@ def test_setup_build_environment_runs_expected_steps(
     ]
 
 
-def test_setup_build_environment_uses_default_spec_when_missing(
+def test_setup_env_default_spec(
         monkeypatch: pytest.MonkeyPatch) -> None:
     """Test setup_build_environment calls get_build_spec when spec is None."""
     resolved_spec = BuildSpec()
@@ -134,7 +134,7 @@ def test_setup_build_environment_uses_default_spec_when_missing(
     setup_build_environment.setup_build_environment()
 
 
-def test_setup_build_environment_cmd_exits_zero(
+def test_setup_env_cmd_exits(
         monkeypatch: pytest.MonkeyPatch) -> None:
     """Test setup_build_environment_cmd exits zero after setup call."""
     called: list[str] = []

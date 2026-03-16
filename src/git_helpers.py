@@ -157,7 +157,7 @@ def _compare_counts_or_warning(repo_label: str, repo_path: Path,
     return counts, None
 
 
-def _branch_and_upstream_or_warnings(
+def _branch_upstream_or_warn(
         repo_label: str, repo_path: Path, timeout_seconds: float) -> \
             tuple[Optional[tuple[str, str]], list[str]]:
     """Resolve branch/upstream names, or return warning list."""
@@ -220,7 +220,7 @@ def _repo_sync_warnings(repo_label: str, repo_path: Path,
             f'{repo_label}: repository folder is missing: {repo_path}'
         ]
     warnings_list: list[str] = []
-    branch_data, branch_warnings = _branch_and_upstream_or_warnings(
+    branch_data, branch_warnings = _branch_upstream_or_warn(
         repo_label=repo_label,
         repo_path=repo_path,
         timeout_seconds=timeout_seconds

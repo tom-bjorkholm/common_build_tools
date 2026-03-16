@@ -12,7 +12,7 @@ from build_spec import BuildSpec
 from common_build_tools.test.helpers import make_build_information
 
 
-def test_clean_build_calls_steps_in_order(
+def test_clean_build_step_order(
         monkeypatch: pytest.MonkeyPatch,
         tmp_path: Path) -> None:
     """Test clean_build calls clean, setup, then do_build in order."""
@@ -45,7 +45,7 @@ def test_clean_build_calls_steps_in_order(
     assert events == ['exit_check', 'clean', 'setup', 'build']
 
 
-def test_clean_build_fetches_spec_and_info_when_missing(
+def test_clean_build_gets_spec_info(
         monkeypatch: pytest.MonkeyPatch,
         tmp_path: Path) -> None:
     """Test clean_build discovers BuildSpec and BuildInformation if omitted."""
@@ -65,7 +65,7 @@ def test_clean_build_fetches_spec_and_info_when_missing(
     assert clean_build.clean_build() == 0
 
 
-def test_clean_build_cmd_exits_with_return_code(
+def test_clean_build_cmd_code(
         monkeypatch: pytest.MonkeyPatch) -> None:
     """Test clean_build_cmd exits with the code from clean_build."""
     monkeypatch.setattr(clean_build, 'extract_python_name',

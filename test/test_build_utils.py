@@ -13,7 +13,7 @@ import pytest
 import build_utils
 
 
-def test_resolve_python_command_uses_which(
+def test_resolve_python_which(
         monkeypatch: pytest.MonkeyPatch) -> None:
     """Test resolve_python_command uses shutil.which when available."""
     monkeypatch.setattr(
@@ -25,7 +25,7 @@ def test_resolve_python_command_uses_which(
     assert result == ['/usr/bin/python3.12']
 
 
-def test_resolve_python_command_falls_back_to_py_launcher(
+def test_resolve_python_falls_back(
         monkeypatch: pytest.MonkeyPatch) -> None:
     """Test resolve_python_command falls back to py launcher lookup."""
     monkeypatch.setattr(build_utils.shutil, 'which', lambda _name: None)
@@ -38,7 +38,7 @@ def test_resolve_python_command_falls_back_to_py_launcher(
     assert result == ['py', '-3.12']
 
 
-def test_try_py_launcher_returns_command_on_success(
+def test_py_launcher_success(
         monkeypatch: pytest.MonkeyPatch) -> None:
     """Test _try_py_launcher returns command when py launcher works."""
     monkeypatch.setattr(build_utils, 'is_windows', lambda: True)
@@ -58,7 +58,7 @@ def test_try_py_launcher_returns_command_on_success(
     assert build_utils._try_py_launcher('python3.14') == ['py', '-3.14']
 
 
-def test_try_py_launcher_returns_empty_on_timeout(
+def test_py_launcher_timeout(
         monkeypatch: pytest.MonkeyPatch) -> None:
     """Test _try_py_launcher handles subprocess timeout by returning empty."""
     monkeypatch.setattr(build_utils, 'is_windows', lambda: True)
@@ -82,7 +82,7 @@ def test_try_py_launcher_returns_empty_on_timeout(
         (True, 'venv/Scripts/python.exe'),
     ]
 )
-def test_venv_python_resolves_expected_path(
+def test_venv_python_path(
         monkeypatch: pytest.MonkeyPatch,
         windows_flag: bool,
         expected_path: str) -> None:
@@ -98,7 +98,7 @@ def test_venv_python_resolves_expected_path(
         (True, 'venv/Scripts/twine.exe'),
     ]
 )
-def test_venv_script_resolves_expected_path(
+def test_venv_script_path(
         monkeypatch: pytest.MonkeyPatch,
         windows_flag: bool,
         expected_path: str) -> None:
@@ -107,7 +107,7 @@ def test_venv_script_resolves_expected_path(
     assert build_utils.venv_script('twine') == expected_path
 
 
-def test_run_command_returns_non_zero_when_check_false(
+def test_run_cmd_non_zero(
         monkeypatch: pytest.MonkeyPatch) -> None:
     """Test run_command returns process code when check is False."""
     completed = subprocess.CompletedProcess(
@@ -122,7 +122,7 @@ def test_run_command_returns_non_zero_when_check_false(
     assert result == 7
 
 
-def test_run_command_exits_when_check_true_and_non_zero(
+def test_run_cmd_exits_non_zero(
         monkeypatch: pytest.MonkeyPatch) -> None:
     """Test run_command exits on non-zero return when check is True."""
     completed = subprocess.CompletedProcess(
@@ -138,7 +138,7 @@ def test_run_command_exits_when_check_true_and_non_zero(
     assert exc_info.value.code == 5
 
 
-def test_run_command_logged_exits_on_non_zero(
+def test_run_cmd_logged_exits(
         monkeypatch: pytest.MonkeyPatch,
         tmp_path: Path) -> None:
     """Test run_command_logged exits when tee helper returns non-zero."""
@@ -149,7 +149,7 @@ def test_run_command_logged_exits_on_non_zero(
     assert exc_info.value.code == 4
 
 
-def test_exit_if_in_virtualenv_raises(
+def test_exit_virtualenv_raises(
         monkeypatch: pytest.MonkeyPatch) -> None:
     """Test exit_if_in_virtualenv exits when VIRTUAL_ENV is set."""
     monkeypatch.setenv('VIRTUAL_ENV', '/tmp/venv')
@@ -158,20 +158,20 @@ def test_exit_if_in_virtualenv_raises(
     assert exc_info.value.code == 1
 
 
-def test_validate_python_name_rejects_invalid_name() -> None:
+def test_validate_python_name() -> None:
     """Test validate_python_name rejects names without python substring."""
     with pytest.raises(SystemExit) as exc_info:
         build_utils.validate_python_name('pypy3.12')
     assert exc_info.value.code == 1
 
 
-def test_extract_python_name_returns_first_match() -> None:
+def test_extract_python_name() -> None:
     """Test extract_python_name returns first python-like CLI argument."""
     args = ['-q', 'python3.13', 'script.py', 'python3.14']
     assert build_utils.extract_python_name(args) == 'python3.13'
 
 
-def test_get_version_from_file_reads_first_version_line(tmp_path: Path) -> \
+def test_get_version_first_line(tmp_path: Path) -> \
         None:
     """Test get_version_from_file reads first matching version assignment."""
     file_path = tmp_path / 'setup.py'
@@ -182,14 +182,14 @@ def test_get_version_from_file_reads_first_version_line(tmp_path: Path) -> \
     assert build_utils.get_version_from_file(file_path) == '1.2.3'
 
 
-def test_append_to_path_env_deduplicates_and_preserves_order() -> None:
+def test_append_path_env_order() -> None:
     """Test append_to_path_env appends unique entries in order."""
     existing = '/a:/b:/a'
     added = [Path('/b'), Path('/c')]
     assert build_utils.append_to_path_env(existing, added) == '/a:/b:/c'
 
 
-def test_is_windows_uses_platform_system(
+def test_is_windows_platform(
         monkeypatch: pytest.MonkeyPatch) -> None:
     """Test is_windows returns True only for Windows platform string."""
     monkeypatch.setattr(build_utils.platform, 'system', lambda: 'Windows')

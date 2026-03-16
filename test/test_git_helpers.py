@@ -120,7 +120,7 @@ def _create_simple_repo(base_path: Path, file_name: str,
     return repo_path
 
 
-def test_get_git_root_for_submodule_and_main() -> None:
+def test_git_root_submodule_main() -> None:
     """Test get_git_root for both submodule and main repository roots."""
     with TemporaryDirectory() as tmp_dir:
         base_path = Path(tmp_dir)
@@ -136,7 +136,7 @@ def test_get_git_root_for_submodule_and_main() -> None:
         ).resolve() == main_repo.resolve()
 
 
-def test_get_git_root_warns_without_parent_repo() -> None:
+def test_git_root_warns_no_parent() -> None:
     """Test get_git_root warns when there is no parent git repository."""
     with TemporaryDirectory() as tmp_dir:
         repo_path = Path(tmp_dir) / 'standalone_repo'
@@ -146,7 +146,7 @@ def test_get_git_root_warns_without_parent_repo() -> None:
         assert root_path.resolve() == repo_path.resolve()
 
 
-def test_get_unstaged_files_main_relative(monkeypatch: pytest.MonkeyPatch) -> \
+def test_unstaged_files_main_rel(monkeypatch: pytest.MonkeyPatch) -> \
         None:
     """Test unstaged files are reported relative to the main repo."""
     with TemporaryDirectory() as tmp_dir:
@@ -169,7 +169,7 @@ def test_get_unstaged_files_main_relative(monkeypatch: pytest.MonkeyPatch) -> \
         assert Path('new.txt') in unstaged_all
 
 
-def test_get_unstaged_files_wr_repo_relative(
+def test_unstaged_files_wr_rel(
         monkeypatch: pytest.MonkeyPatch) -> None:
     """Test wrapped unstaged files are returned as repo-relative paths."""
     with TemporaryDirectory() as tmp_dir:
@@ -191,7 +191,7 @@ def test_get_unstaged_files_wr_repo_relative(
         assert Path('sub.py') in repo_paths[(main_repo / 'submod').resolve()]
 
 
-def test_get_only_line_end_changes(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_only_eol_changes(monkeypatch: pytest.MonkeyPatch) -> None:
     """Test detection of line-ending-only changes including submodules."""
     with TemporaryDirectory() as tmp_dir:
         base_path = Path(tmp_dir)
@@ -207,7 +207,7 @@ def test_get_only_line_end_changes(monkeypatch: pytest.MonkeyPatch) -> None:
         assert Path('changed.txt') not in only_eol
 
 
-def test_restore_bad_eol_changes_only_eol(
+def test_restore_eol_only(
         monkeypatch: pytest.MonkeyPatch) -> None:
     """Test restore_bad_eol_changes restores only line-ending changes."""
     with TemporaryDirectory() as tmp_dir:
@@ -228,7 +228,7 @@ def test_restore_bad_eol_changes_only_eol(
         assert changed_file.read_bytes() == b'changed-content\n'
 
 
-def test_restore_bad_eol_changes_force_unix(
+def test_restore_force_unix(
         monkeypatch: pytest.MonkeyPatch) -> None:
     """Test force_unix converts tracked files even without unstaged changes."""
     with TemporaryDirectory() as tmp_dir:
@@ -248,7 +248,7 @@ def test_restore_bad_eol_changes_force_unix(
         assert (repo_path / 'dos.txt').read_bytes() == b'a\nb\n'
 
 
-def test_restore_bad_eol_changes_verbose_not_allowed(
+def test_restore_not_allowed_msg(
         monkeypatch: pytest.MonkeyPatch,
         capsys: pytest.CaptureFixture[str]) -> None:
     """Test verbose force_unix reports files blocked by allowed patterns."""
@@ -272,7 +272,7 @@ def test_restore_bad_eol_changes_verbose_not_allowed(
         assert 'Not allowed to convert path: skip.bin' in err
 
 
-def test_repo_sync_warnings_report_unpushed_commits() -> None:
+def test_sync_warns_unpushed() -> None:
     """Test repo sync warnings report local commits that are not pushed."""
     with TemporaryDirectory() as tmp_dir:
         base_path = Path(tmp_dir)
@@ -295,7 +295,7 @@ def test_repo_sync_warnings_report_unpushed_commits() -> None:
         )
 
 
-def test_repo_sync_warnings_report_remote_newer_commits() -> None:
+def test_sync_warns_remote_newer() -> None:
     """Test repo sync warnings report when remote has newer commit(s)."""
     with TemporaryDirectory() as tmp_dir:
         base_path = Path(tmp_dir)
@@ -322,7 +322,7 @@ def test_repo_sync_warnings_report_remote_newer_commits() -> None:
         )
 
 
-def test_get_repo_sync_warnings_reports_both_repositories() -> None:
+def test_sync_warns_both_repos() -> None:
     """Test sync warnings include checks for main and common build tools."""
     with TemporaryDirectory() as tmp_dir:
         base_path = Path(tmp_dir)

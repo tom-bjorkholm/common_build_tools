@@ -14,14 +14,14 @@ import create_wrappers
 from wrapper_file_list import WRAPPER_FILES
 
 
-def test_wrapper_content_references_target_function() -> None:
+def test_wrapper_content_target() -> None:
     """Test wrapper content imports and calls the target command function."""
     content = create_wrappers._wrapper_content('do_build')
     assert 'from do_build import do_build_cmd' in content
     assert 'if __name__ == \"__main__\":' in content.replace("'", '"')
 
 
-def test_create_custom_folder_structure_preserves_existing_custom_spec(
+def test_custom_folders_keep_spec(
         tmp_path: Path) -> None:
     """Test custom folder structure creation does not overwrite custom_spec."""
     custom_path = tmp_path / 'custom_build_tools'
@@ -36,7 +36,7 @@ def test_create_custom_folder_structure_preserves_existing_custom_spec(
     assert existing.read_text(encoding='utf-8') == 'ORIGINAL\n'
 
 
-def test_set_wrapper_permissions_sets_executable_on_non_windows(
+def test_wrapper_perms_non_windows(
         monkeypatch: pytest.MonkeyPatch,
         tmp_path: Path) -> None:
     """Test _set_wrapper_permissions sets executable bits on non-Windows."""
@@ -48,7 +48,7 @@ def test_set_wrapper_permissions_sets_executable_on_non_windows(
     assert mode == 0o755
 
 
-def test_create_wrappers_creates_all_files(
+def test_create_wrappers_files(
         monkeypatch: pytest.MonkeyPatch,
         tmp_path: Path) -> None:
     """Test create_wrappers writes expected wrappers and custom folder tree."""

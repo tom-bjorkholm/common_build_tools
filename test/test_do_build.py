@@ -65,7 +65,7 @@ def _report_context(
     )
 
 
-def test_wheel_regex_for_package_matches_dash_and_underscore() -> None:
+def test_wheel_regex_dash_uscore() -> None:
     """Test wheel regex accepts dash and underscore package name variants."""
     pattern = do_build._wheel_regex_for_package('my_pkg')
     assert pattern.match('my_pkg-1.0.0-py3-none-any.whl')
@@ -73,14 +73,14 @@ def test_wheel_regex_for_package_matches_dash_and_underscore() -> None:
     assert pattern.match('other-1.0.0.whl') is None
 
 
-def test_wheel_regex_for_package_accepts_dash_input() -> None:
+def test_wheel_regex_dash_input() -> None:
     """Test wheel regex handles package name input that contains dash."""
     pattern = do_build._wheel_regex_for_package('my-pkg')
     assert pattern.match('my_pkg-1.0.0-py3-none-any.whl')
     assert pattern.match('my-pkg-1.0.0-py3-none-any.whl')
 
 
-def test_find_wheel_returns_sorted_latest(tmp_path: Path) -> None:
+def test_find_wheel_latest(tmp_path: Path) -> None:
     """Test _find_wheel returns lexicographically latest matching wheel."""
     dist_dir = tmp_path / 'dist'
     dist_dir.mkdir()
@@ -92,7 +92,7 @@ def test_find_wheel_returns_sorted_latest(tmp_path: Path) -> None:
     assert wheel.name == 'pkg-1.0.1-py3-none-any.whl'
 
 
-def test_find_wheel_raises_when_missing(tmp_path: Path) -> None:
+def test_find_wheel_missing(tmp_path: Path) -> None:
     """Test _find_wheel raises ValueError when no matching file exists."""
     dist_dir = tmp_path / 'dist'
     dist_dir.mkdir()
@@ -100,7 +100,7 @@ def test_find_wheel_raises_when_missing(tmp_path: Path) -> None:
         _ = do_build._find_wheel(dist_dir=dist_dir, package_name='pkg')
 
 
-def test_pytest_collection_folders_deduplicates(tmp_path: Path) -> None:
+def test_pytest_folders_dedupe(tmp_path: Path) -> None:
     """Test pytest collection folder list preserves order and removes dupes."""
     folder_a = tmp_path / 'a'
     folder_b = tmp_path / 'b'
@@ -118,7 +118,7 @@ def test_pytest_collection_folders_deduplicates(tmp_path: Path) -> None:
     assert folders == [folder_a, folder_b]
 
 
-def test_pytest_command_contains_expected_flags(tmp_path: Path) -> None:
+def test_pytest_cmd_flags(tmp_path: Path) -> None:
     """Test constructed pytest command includes report and coverage flags."""
     package_folder = tmp_path / 'pkg-one'
     package_folder.mkdir(parents=True, exist_ok=True)
@@ -129,17 +129,19 @@ def test_pytest_command_contains_expected_flags(tmp_path: Path) -> None:
     info = make_build_information(tmp_path, [package])
     info['pytest_folders'] = [tmp_path / 'test']
     info['pylint_folders'] = [tmp_path / 'src']
+    (tmp_path / '.pylintrc').write_text('[MAIN]\n', encoding='utf-8')
     report_dir = tmp_path / 'reports'
     command = do_build._pytest_command(['venv/bin/python'], info, report_dir)
     command_text = ' '.join(command)
     assert command[:3] == ['venv/bin/python', '-m', 'pytest']
     assert '--self-contained-html' in command
     assert '--pylint' in command
+    assert f'--pylint-rcfile={tmp_path / ".pylintrc"}' in command
     assert '--cov=pkg_one' in command
     assert 'pytest_report.html' in command_text
 
 
-def test_parse_pytest_summary_extracts_latest(tmp_path: Path) -> None:
+def test_parse_summary_latest(tmp_path: Path) -> None:
     """Test pytest summary parser extracts normalized final summary line."""
     log_file = tmp_path / 'pytest_log.txt'
     log_file.write_text(
@@ -153,7 +155,7 @@ def test_parse_pytest_summary_extracts_latest(tmp_path: Path) -> None:
     assert failed is True
 
 
-def test_parse_pytest_summary_handles_missing_file(tmp_path: Path) -> None:
+def test_parse_summary_missing(tmp_path: Path) -> None:
     """Test pytest summary parser handles missing log file."""
     summary, skipped, failed = do_build._parse_pytest_summary(
         tmp_path / 'missing.log'
@@ -163,7 +165,7 @@ def test_parse_pytest_summary_handles_missing_file(tmp_path: Path) -> None:
     assert failed is False
 
 
-def test_parse_pytest_summary_extracts_skipped_count(tmp_path: Path) -> None:
+def test_parse_summary_skipped(tmp_path: Path) -> None:
     """Test pytest summary parser extracts numeric skipped count."""
     log_file = tmp_path / 'pytest_log.txt'
     log_file.write_text(
@@ -177,7 +179,7 @@ def test_parse_pytest_summary_extracts_skipped_count(tmp_path: Path) -> None:
     assert failed is False
 
 
-def test_replace_test_summary_in_readme_replaces_old_block(
+def test_replace_summary_block(
         tmp_path: Path) -> None:
     """Test README summary block replacement keeps text before heading."""
     readme_path = tmp_path / 'README.md'
@@ -197,7 +199,7 @@ def test_replace_test_summary_in_readme_replaces_old_block(
     assert 'new line' in content
 
 
-def test_generate_reports_success_updates_readmes(
+def test_reports_update_readmes(
         monkeypatch: pytest.MonkeyPatch,
         tmp_path: Path) -> None:
     """Test report generation writes outputs and updates README summaries."""
@@ -241,7 +243,7 @@ def test_generate_reports_success_updates_readmes(
     assert '## Test summary' in package_readme.read_text(encoding='utf-8')
 
 
-def test_generate_reports_returns_error_on_lint_failure(
+def test_reports_error_on_lint(
         monkeypatch: pytest.MonkeyPatch,
         tmp_path: Path) -> None:
     """Test report generation returns non-zero when linter fails."""
@@ -269,7 +271,7 @@ def test_generate_reports_returns_error_on_lint_failure(
     assert result == 1
 
 
-def test_generate_reports_includes_repo_sync_warnings(
+def test_reports_sync_warnings(
         monkeypatch: pytest.MonkeyPatch,
         tmp_path: Path) -> None:
     """Test report generation writes repository sync warnings in html."""
@@ -304,7 +306,7 @@ def test_generate_reports_includes_repo_sync_warnings(
     assert warning_text in index_text
 
 
-def test_generate_reports_skipped_over_limit_keeps_readmes_unchanged(
+def test_reports_skip_limit(
         monkeypatch: pytest.MonkeyPatch,
         tmp_path: Path) -> None:
     """Test README summary update is skipped when skipped count is too high."""
@@ -348,7 +350,7 @@ def test_generate_reports_skipped_over_limit_keeps_readmes_unchanged(
     assert '## Test summary' not in package_readme.read_text(encoding='utf-8')
 
 
-def test_generate_reports_raises_on_negative_skipped_limit(
+def test_reports_reject_neg_skip(
         tmp_path: Path) -> None:
     """Test invalid negative README skipped threshold raises ValueError."""
     info = make_build_information(tmp_path)
@@ -369,7 +371,7 @@ def test_generate_reports_raises_on_negative_skipped_limit(
         )
 
 
-def test_do_build_calls_hooks_and_core_steps(
+def test_do_build_runs_steps(
         monkeypatch: pytest.MonkeyPatch,
         tmp_path: Path) -> None:
     """Test do_build orchestrates hooks and core steps in expected order."""
@@ -471,7 +473,7 @@ def test_do_build_calls_hooks_and_core_steps(
     ]
 
 
-def test_do_build_prints_repo_sync_warnings_start_and_end(
+def test_do_build_prints_sync_warns(
         monkeypatch: pytest.MonkeyPatch, tmp_path: Path,
         capsys: pytest.CaptureFixture[str]) -> None:
     """Test do_build prints repository sync warnings at start and end."""
@@ -507,7 +509,7 @@ def test_do_build_prints_repo_sync_warnings_start_and_end(
     assert err.count(warning_text) == 2
 
 
-def test_do_build_returns_pydoc_error_after_reports(
+def test_do_build_pydoc_error(
         monkeypatch: pytest.MonkeyPatch,
         tmp_path: Path) -> None:
     """Test do_build returns pydoc error code after report generation."""
@@ -543,7 +545,7 @@ def test_do_build_returns_pydoc_error_after_reports(
                              build_information=info) == 2
 
 
-def test_do_build_logs_unhandled_exception_to_build_log(
+def test_do_build_logs_traceback(
         monkeypatch: pytest.MonkeyPatch,
         tmp_path: Path) -> None:
     """Test unexpected exception traceback is appended to build log."""

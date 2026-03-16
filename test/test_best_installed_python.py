@@ -14,7 +14,7 @@ import pytest
 import best_installed_python
 
 
-def test_find_via_py_launcher_parses_python3_versions(
+def test_py_launcher_parses_py3(
         monkeypatch: pytest.MonkeyPatch) -> None:
     """Test py launcher parsing keeps unique Python 3 major versions."""
     monkeypatch.setattr(
@@ -38,7 +38,7 @@ def test_find_via_py_launcher_parses_python3_versions(
     assert sorted(versions) == [(3, 12), (3, 14)]
 
 
-def test_find_via_py_launcher_returns_empty_on_timeout(
+def test_py_launcher_timeout(
         monkeypatch: pytest.MonkeyPatch) -> None:
     """Test py launcher discovery returns empty list after timeout."""
     monkeypatch.setattr(
@@ -62,7 +62,7 @@ def _create_executable(path: Path) -> None:
     path.chmod(current_mode | stat.S_IXUSR)
 
 
-def test_find_via_path_scan_discovers_python_executables(
+def test_path_scan_finds_pythons(
         monkeypatch: pytest.MonkeyPatch,
         tmp_path: Path) -> None:
     """Test path scan finds python3.X executables and deduplicates minors."""
@@ -79,7 +79,7 @@ def test_find_via_path_scan_discovers_python_executables(
     assert versions == [(3, 12), (3, 14)]
 
 
-def test_find_best_python_name_from_path_scan(
+def test_best_python_from_path(
         monkeypatch: pytest.MonkeyPatch) -> None:
     """Test best python name is selected from path scan candidates."""
     monkeypatch.setattr(best_installed_python, 'is_windows', lambda: False)
@@ -88,7 +88,7 @@ def test_find_best_python_name_from_path_scan(
     assert best_installed_python.find_best_python_name() == 'python3.14'
 
 
-def test_find_best_python_name_exits_when_none_found(
+def test_best_python_exits_none(
         monkeypatch: pytest.MonkeyPatch) -> None:
     """Test find_best_python_name exits when no interpreter is discovered."""
     monkeypatch.setattr(best_installed_python, 'is_windows', lambda: False)
@@ -99,7 +99,7 @@ def test_find_best_python_name_exits_when_none_found(
     assert exc_info.value.code == 1
 
 
-def test_resolve_target_python_with_explicit_name(
+def test_resolve_target_explicit(
         monkeypatch: pytest.MonkeyPatch) -> None:
     """Test explicit python version resolution for resolve_target_python."""
     monkeypatch.setattr(best_installed_python, 'validate_python_name',
@@ -111,7 +111,7 @@ def test_resolve_target_python_with_explicit_name(
     assert command == ['/usr/bin/python3.13']
 
 
-def test_resolve_target_python_uses_best_when_name_missing(
+def test_resolve_target_uses_best(
         monkeypatch: pytest.MonkeyPatch) -> None:
     """Test resolve_target_python uses discovered best version if omitted."""
     monkeypatch.setattr(best_installed_python, 'find_best_python_name',
@@ -123,7 +123,7 @@ def test_resolve_target_python_uses_best_when_name_missing(
     assert command == ['python3.14']
 
 
-def test_resolve_target_python_exits_when_unresolved(
+def test_resolve_target_unresolved(
         monkeypatch: pytest.MonkeyPatch) -> None:
     """Test resolve_target_python exits when command resolution fails."""
     monkeypatch.setattr(best_installed_python, 'validate_python_name',
