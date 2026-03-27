@@ -13,7 +13,7 @@ import shutil
 import subprocess
 import sys
 import traceback
-from typing import NamedTuple, Optional
+from typing import Mapping, NamedTuple, Optional
 
 from best_installed_python import resolve_target_python
 from build_information import get_build_information
@@ -64,17 +64,28 @@ class ReportSummary(NamedTuple):
 
     version_text: str
     test_summary: str
-    flake8_clean: bool
-    mypy_clean: bool
+    flake8_clean: Optional[bool]
+    mypy_clean: Optional[bool]
     python_version: str
+    build_failed: bool
+    failure_messages: list[str]
+    missing_report_messages: dict[str, str]
     repo_sync_warnings: list[str]
 
 
 class BuildRunStatus(NamedTuple):
     """Exit status values needed when generating final build reports."""
 
-    lint_codes: dict[str, int]
-    pytest_code: int
+    lint_codes: Mapping[str, Optional[int]]
+    pytest_code: Optional[int]
+    pydoc_code: Optional[int]
+
+
+class BuildFailure(NamedTuple):
+    """Failure details for builds that fail after wheel installation."""
+
+    phase: str
+    detail: str
 
 
 class ReportGenerationContext(NamedTuple):
@@ -85,6 +96,7 @@ class ReportGenerationContext(NamedTuple):
     report_paths: dict[str, Path]
     venv_cmd: list[str]
     build_run_status: BuildRunStatus
+    build_failure: Optional[BuildFailure]
     repo_sync_warnings: list[str]
 
 
@@ -96,6 +108,15 @@ def _run_custom_hooks(hooks: Optional[list[CustomFunction]],
         return
     for hook in hooks:
         hook(build_spec, build_information)
+
+
+def _initial_build_run_status() -> BuildRunStatus:
+    """Return build run status before lint, pytest and pydoc have run."""
+    return BuildRunStatus(
+        lint_codes={'mypy': None, 'flake8': None},
+        pytest_code=None,
+        pydoc_code=None
+    )
 
 
 def _ensure_venv(python_name: Optional[str], project_root: Path,
@@ -412,20 +433,118 @@ def _parse_pytest_summary(pytest_log: Path) -> tuple[str, int, bool]:
     )
 
 
-def _check_flake8_clean(report_paths: dict[str, Path]) -> bool:
-    """Return True when flake8 report indicates no issues."""
+def _check_flake8_clean(report_paths: dict[str, Path]) -> Optional[bool]:
+    """Return flake8 status, or None if no flake8 report was generated."""
     index_file = report_paths['flake_dir'] / 'index.html'
     if not index_file.exists():
-        return False
+        return None
     return 'No flake8 errors found' in index_file.read_text(encoding='utf-8')
 
 
-def _check_mypy_clean(report_paths: dict[str, Path]) -> bool:
-    """Return True when mypy log indicates success."""
+def _check_mypy_clean(report_paths: dict[str, Path]) -> Optional[bool]:
+    """Return mypy status, or None if no mypy log was generated."""
     if not report_paths['mypy_log'].exists():
-        return False
+        return None
     content = report_paths['mypy_log'].read_text(encoding='utf-8')
+    if 'No mypy targets discovered.' in content:
+        return None
     return 'Success: no issues found' in content
+
+
+def _test_summary_text(test_summary: str) -> str:
+    """Return display text for the pytest summary."""
+    if test_summary:
+        return test_summary
+    return 'Pytest summary not available.'
+
+
+def _flake8_summary_text(flake8_clean: Optional[bool]) -> str:
+    """Return display text for the flake8 summary."""
+    if flake8_clean is True:
+        return 'No flake8 warnings.'
+    if flake8_clean is False:
+        return 'Flake8 errors/warnings.'
+    return 'Flake8 report not available.'
+
+
+def _mypy_summary_text(mypy_clean: Optional[bool]) -> str:
+    """Return display text for the mypy summary."""
+    if mypy_clean is True:
+        return 'No mypy errors found.'
+    if mypy_clean is False:
+        return 'mypy errors.'
+    return 'mypy report not available.'
+
+
+def _build_failure_messages(
+        report_context: ReportGenerationContext,
+        pytest_failed: bool) -> list[str]:
+    """Return failure messages for the final build summary."""
+    failure_messages: list[str] = []
+    if report_context.build_failure is not None:
+        failure_messages.append(
+            f'Failure in phase {report_context.build_failure.phase}: '
+            f'{report_context.build_failure.detail}'
+        )
+    if report_context.build_run_status.pydoc_code not in (None, 0):
+        failure_messages.append(
+            'pydoc-markdown returned '
+            f'exit code {report_context.build_run_status.pydoc_code}.'
+        )
+    flake8_code = report_context.build_run_status.lint_codes.get('flake8')
+    if flake8_code not in (None, 0):
+        failure_messages.append('flake8 reported errors or warnings.')
+    mypy_code = report_context.build_run_status.lint_codes.get('mypy')
+    if mypy_code not in (None, 0):
+        failure_messages.append('mypy reported errors.')
+    if (report_context.build_run_status.pytest_code not in (None, 0) or
+            pytest_failed):
+        failure_messages.append('pytest reported failures or errors.')
+    return failure_messages
+
+
+def _report_path_from_href(report_dir: Path, href: str) -> Path:
+    """Return file path for one report link."""
+    return report_dir / href.split('?', maxsplit=1)[0]
+
+
+def _missing_report_message(
+        href: str,
+        build_run_status: BuildRunStatus,
+        build_failed: bool) -> str:
+    """Return explanation text for one missing report link."""
+    if not build_failed:
+        return 'not generated'
+    if href in ('mypy_report/index.html', 'mypy_errors.txt'):
+        if build_run_status.lint_codes.get('mypy') is None:
+            return 'not generated because build failed earlier'
+    if href in ('flake_report/index.html', 'flake8_log.txt'):
+        if build_run_status.lint_codes.get('flake8') is None:
+            return 'not generated because build failed earlier'
+    if (href.startswith('pytest_report.html') or
+            href in ('coverage/index.html', 'pylint_log.txt',
+                     'pytest_log.txt')):
+        if build_run_status.pytest_code is None:
+            return 'not generated because build failed earlier'
+    return 'not generated'
+
+
+def _missing_report_messages(
+        report_paths: dict[str, Path],
+        build_run_status: BuildRunStatus,
+        build_failed: bool) -> dict[str, str]:
+    """Return missing-report explanations keyed by link target."""
+    missing_messages: dict[str, str] = {}
+    report_dir = report_paths['report_dir']
+    for href, _text in REPORT_LINKS:
+        if _report_path_from_href(report_dir=report_dir, href=href).exists():
+            continue
+        missing_messages[href] = _missing_report_message(
+            href=href,
+            build_run_status=build_run_status,
+            build_failed=build_failed
+        )
+    return missing_messages
 
 
 def _replace_test_summary_in_readme(readme_path: Path,
@@ -509,24 +628,45 @@ def _write_html_report(build_information: BuildInformation,
                 '<h1>Build report %Y-%m-%d %H:%M</h1>\n'
             )
         )
+        if report_summary.build_failed:
+            file_obj.write(
+                '  <h2 style="color: #a00000;">Build failed</h2>\n'
+            )
+            file_obj.write('  <ul>\n')
+            for failure_message in report_summary.failure_messages:
+                escaped_message = html.escape(failure_message)
+                file_obj.write(f'    <li>{escaped_message}</li>\n')
+            file_obj.write('  </ul>\n')
+        else:
+            file_obj.write(
+                '  <h2 style="color: #006400;">Build succeeded</h2>\n'
+            )
         package_names = ', '.join(
             package_data['name']
             for package_data in build_information['package_information']
         )
-        file_obj.write(f'<h2>Packages: {package_names}</h2>\n')
         file_obj.write(
-            f'<h3>Version(s): {report_summary.version_text}</h3>\n'
+            f'<h2>Packages: {html.escape(package_names)}</h2>\n'
         )
-        if report_summary.test_summary:
-            file_obj.write(f'<p>{report_summary.test_summary}</p>\n')
-        if report_summary.flake8_clean:
-            file_obj.write('<p>No flake8 warnings.</p>\n')
-        else:
-            file_obj.write('<p>Flake8 errors/warnings.</p>\n')
-        if report_summary.mypy_clean:
-            file_obj.write('<p>No mypy errors found.</p>\n')
-        else:
-            file_obj.write('<p>mypy errors.</p>\n')
+        file_obj.write(
+            f'<h3>Version(s): '
+            f'{html.escape(report_summary.version_text)}</h3>\n'
+        )
+        file_obj.write(
+            '<p>'
+            f'{html.escape(_test_summary_text(report_summary.test_summary))}'
+            '</p>\n'
+        )
+        file_obj.write(
+            '<p>'
+            f'{html.escape(_flake8_summary_text(report_summary.flake8_clean))}'
+            '</p>\n'
+        )
+        file_obj.write(
+            '<p>'
+            f'{html.escape(_mypy_summary_text(report_summary.mypy_clean))}'
+            '</p>\n'
+        )
         if report_summary.repo_sync_warnings:
             file_obj.write('<h3>Repository synchronization warnings</h3>\n')
             file_obj.write('<ul>\n')
@@ -535,11 +675,23 @@ def _write_html_report(build_information: BuildInformation,
                 file_obj.write(f'  <li>{escaped_warning}</li>\n')
             file_obj.write('</ul>\n')
         file_obj.write(
-            f'<p>Build and test using {report_summary.python_version}</p>\n'
+            '<p>Build and test using '
+            f'{html.escape(report_summary.python_version)}</p>\n'
         )
         file_obj.write('<ul>\n')
         for href, text in REPORT_LINKS:
-            file_obj.write(f'  <li><a href="{href}">{text}</a></li>\n')
+            missing_message = report_summary.missing_report_messages.get(href)
+            if missing_message is None:
+                file_obj.write(
+                    '  <li><a href="'
+                    f'{href}">{html.escape(text)}</a></li>\n'
+                )
+                continue
+            escaped_text = html.escape(text)
+            escaped_message = html.escape(missing_message)
+            file_obj.write(
+                f'  <li>{escaped_text} ({escaped_message}).</li>\n'
+            )
         file_obj.write('</ul>\n')
         file_obj.write('</body>\n</html>\n')
 
@@ -550,15 +702,16 @@ def _write_test_summary(report_paths: dict[str, Path],
     summary_file = report_paths['report_dir'] / 'test_summary.md'
     with open(summary_file, 'w', encoding='utf-8') as file_obj:
         file_obj.write('## Test summary\n\n')
-        file_obj.write(f'- Test result: {report_summary.test_summary}\n')
-        if report_summary.flake8_clean:
-            file_obj.write('- No Flake8 warnings.\n')
-        else:
-            file_obj.write('- Flake8 errors/warnings.\n')
-        if report_summary.mypy_clean:
-            file_obj.write('- No mypy errors found.\n')
-        else:
-            file_obj.write('- mypy errors.\n')
+        file_obj.write(
+            f'- Test result: '
+            f'{_test_summary_text(report_summary.test_summary)}\n'
+        )
+        file_obj.write(
+            f'- {_flake8_summary_text(report_summary.flake8_clean)}\n'
+        )
+        file_obj.write(
+            f'- {_mypy_summary_text(report_summary.mypy_clean)}\n'
+        )
         file_obj.write(f'- Built version(s): {report_summary.version_text}\n')
         file_obj.write(
             f'- Build and test using {report_summary.python_version}\n'
@@ -580,12 +733,24 @@ def _generate_reports(report_context: ReportGenerationContext) -> int:
         venv_cmd=report_context.venv_cmd,
         project_root=report_context.build_information['project_root']
     )
+    failure_messages = _build_failure_messages(
+        report_context=report_context,
+        pytest_failed=pytest_failed
+    )
+    build_failed = bool(failure_messages)
     report_summary = ReportSummary(
         version_text=version_text,
         test_summary=pytest_summary,
         flake8_clean=flake8_clean,
         mypy_clean=mypy_clean,
         python_version=python_version,
+        build_failed=build_failed,
+        failure_messages=failure_messages,
+        missing_report_messages=_missing_report_messages(
+            report_paths=report_context.report_paths,
+            build_run_status=report_context.build_run_status,
+            build_failed=build_failed
+        ),
         repo_sync_warnings=list(report_context.repo_sync_warnings),
     )
     _write_html_report(
@@ -597,15 +762,11 @@ def _generate_reports(report_context: ReportGenerationContext) -> int:
         report_paths=report_context.report_paths,
         report_summary=report_summary
     )
-    if skipped <= report_context.build_spec.readme_summary_max_skipped:
+    if (pytest_summary and
+            skipped <= report_context.build_spec.readme_summary_max_skipped):
         _update_readmes(build_information=report_context.build_information,
                         summary_file=summary_file)
-    lint_failed = any(
-        return_code != 0
-        for return_code in report_context.build_run_status.lint_codes.values()
-    )
-    if (report_context.build_run_status.pytest_code != 0 or
-            pytest_failed or lint_failed):
+    if build_failed:
         return 1
     return 0
 
@@ -641,11 +802,28 @@ def _append_traceback_to_build_log(
         file_obj.write(traceback.format_exc())
 
 
+def _build_failure_detail(error: Exception) -> str:
+    """Return short failure detail text for one raised exception."""
+    return f'{type(error).__name__}: {error}'
+
+
+def _generate_reports_after_failure(
+        report_context: ReportGenerationContext) -> None:
+    """Best-effort report generation for failures after wheel install."""
+    try:
+        _ = _generate_reports(report_context=report_context)
+    except Exception:  # pylint: disable=broad-exception-caught
+        _append_traceback_to_build_log(
+            project_root=report_context.build_information['project_root'],
+            report_paths=report_context.report_paths
+        )
+
+
 def do_build(python_name: Optional[str] = None,
              build_spec: Optional[BuildSpec] = None,
              build_information: Optional[BuildInformation] = None) -> int:
     """Run complete build process with reports and optional custom hooks."""
-    # pylint: disable=too-many-locals
+    # pylint: disable=too-many-locals,too-many-statements
     active_spec = get_build_spec() if build_spec is None else build_spec
     active_information = build_information
     if active_information is None:
@@ -654,8 +832,14 @@ def do_build(python_name: Optional[str] = None,
     repo_sync_warnings = get_repo_sync_warnings(project_root)
     _print_repo_sync_warnings(repo_sync_warnings=repo_sync_warnings)
     report_paths: Optional[dict[str, Path]] = None
+    venv_cmd: Optional[list[str]] = None
+    build_run_status = _initial_build_run_status()
+    reports_enabled = False
+    current_phase = 'initialization'
     try:
+        current_phase = 'python selection'
         resolve_target_python(python_name)
+        current_phase = 'virtual environment setup'
         _ensure_venv(
             python_name=python_name,
             project_root=project_root,
@@ -663,8 +847,10 @@ def do_build(python_name: Optional[str] = None,
             build_information=active_information
         )
         venv_cmd = venv_python()
+        current_phase = 'custom_before_clean hooks'
         _run_custom_hooks(active_spec.custom_before_clean, active_spec,
                           active_information)
+        current_phase = 'prepare output directories'
         report_paths = _prepare_directories(
             project_root=project_root,
             build_information=active_information
@@ -675,8 +861,10 @@ def do_build(python_name: Optional[str] = None,
             ),
             encoding='utf-8'
         )
+        current_phase = 'custom_before_build hooks'
         _run_custom_hooks(active_spec.custom_before_build, active_spec,
                           active_information)
+        current_phase = 'build wheel packages'
         build_code = _build_packages(
             venv_cmd=venv_cmd,
             build_information=active_information,
@@ -685,8 +873,10 @@ def do_build(python_name: Optional[str] = None,
         )
         if build_code != 0:
             return build_code
+        current_phase = 'custom_before_install hooks'
         _run_custom_hooks(active_spec.custom_before_install, active_spec,
                           active_information)
+        current_phase = 'install wheel packages'
         install_code = _install_packages(
             venv_cmd=venv_cmd,
             build_information=active_information,
@@ -696,14 +886,23 @@ def do_build(python_name: Optional[str] = None,
         )
         if install_code != 0:
             return install_code
+        reports_enabled = True
+        current_phase = 'custom_before_test hooks'
         _run_custom_hooks(active_spec.custom_before_test, active_spec,
                           active_information)
+        current_phase = 'mypy and flake8'
         lint_codes = _run_linters(
             venv_cmd=venv_cmd,
             build_information=active_information,
             report_paths=report_paths,
             project_root=project_root
         )
+        build_run_status = BuildRunStatus(
+            lint_codes=lint_codes,
+            pytest_code=None,
+            pydoc_code=None
+        )
+        current_phase = 'pytest'
         pytest_code = _run_pytest(
             venv_cmd=venv_cmd,
             build_information=active_information,
@@ -711,41 +910,68 @@ def do_build(python_name: Optional[str] = None,
             report_dir=report_paths['report_dir'],
             project_root=project_root
         )
+        build_run_status = BuildRunStatus(
+            lint_codes=lint_codes,
+            pytest_code=pytest_code,
+            pydoc_code=None
+        )
+        current_phase = 'custom_after_test hooks'
         _run_custom_hooks(active_spec.custom_after_test, active_spec,
                           active_information)
+        current_phase = 'pydoc-markdown'
         pydoc_code = _run_pydoc_markdown(
             venv_cmd=venv_cmd,
             build_spec=active_spec,
             build_log=report_paths['build_log'],
             project_root=project_root
         )
+        build_run_status = BuildRunStatus(
+            lint_codes=lint_codes,
+            pytest_code=pytest_code,
+            pydoc_code=pydoc_code
+        )
+        current_phase = 'custom_final hooks'
         _run_custom_hooks(active_spec.custom_final, active_spec,
                           active_information)
+        current_phase = 'restore line-ending-only changes'
         restored_files = _restore_line_end_only_changes()
         if restored_files:
             print(f'Restored {len(restored_files)} line-ending-only changes.',
                   file=sys.stderr)
-        build_run_status = BuildRunStatus(
-            lint_codes=lint_codes,
-            pytest_code=pytest_code
-        )
         report_context = ReportGenerationContext(
             build_information=active_information,
             build_spec=active_spec,
             report_paths=report_paths,
             venv_cmd=venv_cmd,
             build_run_status=build_run_status,
+            build_failure=None,
             repo_sync_warnings=repo_sync_warnings
         )
         report_code = _generate_reports(report_context=report_context)
         if pydoc_code != 0:
             return pydoc_code
         return report_code
-    except Exception:
+    except Exception as error:
         _append_traceback_to_build_log(
             project_root=project_root,
             report_paths=report_paths
         )
+        if (reports_enabled and report_paths is not None and
+                venv_cmd is not None):
+            _generate_reports_after_failure(
+                report_context=ReportGenerationContext(
+                    build_information=active_information,
+                    build_spec=active_spec,
+                    report_paths=report_paths,
+                    venv_cmd=venv_cmd,
+                    build_run_status=build_run_status,
+                    build_failure=BuildFailure(
+                        phase=current_phase,
+                        detail=_build_failure_detail(error)
+                    ),
+                    repo_sync_warnings=repo_sync_warnings
+                )
+            )
         raise
     finally:
         _print_repo_sync_warnings(

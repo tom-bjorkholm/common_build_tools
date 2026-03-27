@@ -6,7 +6,7 @@
 # pylint: disable=protected-access
 
 from pathlib import Path
-from typing import Callable
+from typing import Callable, Optional
 import pytest
 
 import do_build
@@ -40,11 +40,18 @@ def _report_context(
         build_information: BuildInformation,
         report_paths: dict[str, Path],
         readme_summary_max_skipped: int = 0,
-        lint_codes: dict[str, int] | None = None,
-        repo_sync_warnings: list[str] | None = None
+        lint_codes: Optional[dict[str, Optional[int]]] = None,
+        pytest_code: Optional[int] = 0,
+        pydoc_code: Optional[int] = 0,
+        build_failure: Optional[do_build.BuildFailure] = None,
+        repo_sync_warnings: Optional[list[str]] = None
 ) -> do_build.ReportGenerationContext:
     """Create report context used by do_build report generation tests."""
-    resolved_lint_codes = {'mypy': 0, 'flake8': 0}
+    # pylint: disable=too-many-arguments,too-many-positional-arguments
+    resolved_lint_codes: dict[str, Optional[int]] = {
+        'mypy': 0,
+        'flake8': 0,
+    }
     if lint_codes is not None:
         resolved_lint_codes = lint_codes
     resolved_repo_sync_warnings: list[str] = []
@@ -59,8 +66,10 @@ def _report_context(
         venv_cmd=['venv/bin/python'],
         build_run_status=do_build.BuildRunStatus(
             lint_codes=resolved_lint_codes,
-            pytest_code=0
+            pytest_code=pytest_code,
+            pydoc_code=pydoc_code
         ),
+        build_failure=build_failure,
         repo_sync_warnings=resolved_repo_sync_warnings,
     )
 
@@ -350,6 +359,77 @@ def test_reports_skip_limit(
     assert '## Test summary' not in package_readme.read_text(encoding='utf-8')
 
 
+def test_reports_skip_readmes_without_pytest_summary(
+        monkeypatch: pytest.MonkeyPatch,
+        tmp_path: Path) -> None:
+    """Test README summary update is skipped without a pytest summary."""
+    package_folder = tmp_path / 'pkg-one'
+    package_folder.mkdir(parents=True, exist_ok=True)
+    package = make_package_information(
+        package_folder=package_folder,
+        name='pkg-one'
+    )
+    package_readme = package['package_folder'] / 'README_pypi.md'
+    package_readme.write_text('# package\n', encoding='utf-8')
+    root_readme = tmp_path / 'README.md'
+    root_readme.write_text('# root\n', encoding='utf-8')
+    info = make_build_information(tmp_path, [package])
+    report_dir = tmp_path / 'reports'
+    report_dir.mkdir()
+    dist_dir = tmp_path / 'dist'
+    dist_dir.mkdir()
+    paths = _report_paths(report_dir, dist_dir)
+    paths['mypy_log'].write_text('Success: no issues found\n',
+                                 encoding='utf-8')
+    (paths['flake_dir'] / 'index.html').write_text(
+        'No flake8 errors found',
+        encoding='utf-8'
+    )
+    monkeypatch.setattr(do_build, '_get_python_version',
+                        lambda **_kwargs: 'Python')
+    result = do_build._generate_reports(
+        report_context=_report_context(
+            build_information=info,
+            report_paths=paths
+        )
+    )
+    assert result == 0
+    assert '## Test summary' not in root_readme.read_text(encoding='utf-8')
+    assert '## Test summary' not in package_readme.read_text(encoding='utf-8')
+
+
+def test_reports_failure_banner_and_missing_reports(
+        monkeypatch: pytest.MonkeyPatch,
+        tmp_path: Path) -> None:
+    """Test failure summary is visible and missing links explain why."""
+    info = make_build_information(tmp_path)
+    report_dir = tmp_path / 'reports'
+    report_dir.mkdir()
+    dist_dir = tmp_path / 'dist'
+    dist_dir.mkdir()
+    paths = _report_paths(report_dir, dist_dir)
+    monkeypatch.setattr(do_build, '_get_python_version',
+                        lambda **_kwargs: 'Python')
+    result = do_build._generate_reports(
+        report_context=_report_context(
+            build_information=info,
+            report_paths=paths,
+            lint_codes={'mypy': None, 'flake8': None},
+            pytest_code=None,
+            pydoc_code=None,
+            build_failure=do_build.BuildFailure(
+                phase='custom_before_test hooks',
+                detail='RuntimeError: example crashed'
+            )
+        )
+    )
+    assert result == 1
+    index_text = (report_dir / 'index.html').read_text(encoding='utf-8')
+    assert 'Build failed' in index_text
+    assert 'custom_before_test hooks' in index_text
+    assert 'not generated because build failed earlier' in index_text
+
+
 def test_reports_reject_neg_skip(
         tmp_path: Path) -> None:
     """Test invalid negative README skipped threshold raises ValueError."""
@@ -500,6 +580,8 @@ def test_do_build_prints_sync_warns(
     monkeypatch.setattr(do_build, '_ensure_venv', lambda **_kwargs: None)
     monkeypatch.setattr(do_build, '_prepare_directories', _prepare)
     monkeypatch.setattr(do_build, '_build_packages', lambda **_kwargs: 2)
+    monkeypatch.setattr(do_build, '_generate_reports',
+                        lambda **_kwargs: pytest.fail('unexpected reports'))
     result = do_build.do_build(build_spec=BuildSpec(),
                                build_information=info)
     assert result == 2
@@ -514,6 +596,7 @@ def test_do_build_pydoc_error(
         tmp_path: Path) -> None:
     """Test do_build returns pydoc error code after report generation."""
     info = make_build_information(tmp_path)
+    report_contexts: list[do_build.ReportGenerationContext] = []
 
     def _prepare(project_root: Path,
                  build_information: BuildInformation) -> dict[str, Path]:
@@ -540,9 +623,95 @@ def test_do_build_pydoc_error(
                         lambda **_kwargs: 2)
     monkeypatch.setattr(do_build, '_restore_line_end_only_changes',
                         lambda: [])
-    monkeypatch.setattr(do_build, '_generate_reports', lambda **_kwargs: 0)
+
+    def _capture_report(**kwargs: object) -> int:
+        report_context = kwargs['report_context']
+        assert isinstance(report_context, do_build.ReportGenerationContext)
+        report_contexts.append(report_context)
+        return 0
+
+    monkeypatch.setattr(do_build, '_generate_reports', _capture_report)
     assert do_build.do_build(build_spec=BuildSpec(),
                              build_information=info) == 2
+    assert len(report_contexts) == 1
+    assert report_contexts[0].build_run_status.pydoc_code == 2
+    assert report_contexts[0].build_failure is None
+
+
+def test_do_build_writes_reports_on_post_install_exception(
+        monkeypatch: pytest.MonkeyPatch,
+        tmp_path: Path) -> None:
+    """Test post-install exceptions still produce reports/index.html."""
+    info = make_build_information(tmp_path)
+
+    def _prepare(project_root: Path,
+                 build_information: BuildInformation) -> dict[str, Path]:
+        _ = project_root
+        _ = build_information
+        report_dir = tmp_path / 'reports'
+        report_dir.mkdir(exist_ok=True)
+        dist_dir = tmp_path / 'dist'
+        dist_dir.mkdir(exist_ok=True)
+        return _report_paths(report_dir, dist_dir)
+
+    def _run_linters(**kwargs: object) -> dict[str, int]:
+        report_paths = kwargs['report_paths']
+        assert isinstance(report_paths, dict)
+        report_paths['mypy_log'].write_text(
+            'Success: no issues found\n',
+            encoding='utf-8'
+        )
+        (report_paths['flake_dir'] / 'index.html').write_text(
+            'No flake8 errors found',
+            encoding='utf-8'
+        )
+        return {'mypy': 0, 'flake8': 0}
+
+    def _run_pytest(**kwargs: object) -> int:
+        pytest_log = kwargs['pytest_log']
+        report_dir = kwargs['report_dir']
+        assert isinstance(pytest_log, Path)
+        assert isinstance(report_dir, Path)
+        pytest_log.write_text('=== 3 passed in 0.10s ===\n',
+                              encoding='utf-8')
+        (report_dir / 'pytest_report.html').write_text('pytest report',
+                                                       encoding='utf-8')
+        (report_dir / 'coverage').mkdir(exist_ok=True)
+        (report_dir / 'coverage' / 'index.html').write_text(
+            'coverage report',
+            encoding='utf-8'
+        )
+        (report_dir / do_build.PYLINT_LOG_NAME).write_text(
+            'pylint report\n',
+            encoding='utf-8'
+        )
+        return 0
+
+    def _raise_after_test(_spec: BuildSpec,
+                          _info: BuildInformation) -> None:
+        raise RuntimeError('example crashed')
+
+    monkeypatch.setattr(do_build, 'resolve_target_python',
+                        lambda _python_name: ('python3.14', ['python3.14']))
+    monkeypatch.setattr(do_build, '_get_python_version',
+                        lambda **_kwargs: 'Python')
+    monkeypatch.setattr(do_build, '_ensure_venv', lambda **_kwargs: None)
+    monkeypatch.setattr(do_build, '_prepare_directories', _prepare)
+    monkeypatch.setattr(do_build, '_build_packages', lambda **_kwargs: 0)
+    monkeypatch.setattr(do_build, '_install_packages', lambda **_kwargs: 0)
+    monkeypatch.setattr(do_build, '_run_linters', _run_linters)
+    monkeypatch.setattr(do_build, '_run_pytest', _run_pytest)
+    with pytest.raises(RuntimeError, match='example crashed'):
+        _ = do_build.do_build(
+            build_spec=BuildSpec(custom_after_test=[_raise_after_test]),
+            build_information=info
+        )
+    index_text = (tmp_path / 'reports' / 'index.html').read_text(
+        encoding='utf-8'
+    )
+    assert 'Build failed' in index_text
+    assert 'custom_after_test hooks' in index_text
+    assert 'example crashed' in index_text
 
 
 def test_do_build_logs_traceback(
@@ -577,3 +746,4 @@ def test_do_build_logs_traceback(
     assert 'Unhandled exception' in content
     assert 'Traceback' in content
     assert 'ValueError: install failed' in content
+    assert not (tmp_path / 'reports' / 'index.html').exists()
