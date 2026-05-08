@@ -213,15 +213,64 @@ def _fits_after(column: int, added_text: str, max_line_length: int) -> bool:
     return column + len(added_text) <= max_line_length
 
 
+def _close_suffix(lines: list[str], close_token: TokenInfo) -> str:
+    """Return source text from the closing parenthesis to line end."""
+    line = _line_text(lines, close_token.start[0])
+    return line[close_token.start[1]:].rstrip()
+
+
+def _element_close_suffix(tokens: list[TokenInfo], target: Target,
+                          elements: list[Element], lines: list[str],
+                          index: int) -> str:
+    """Return close suffix that moves with element at index."""
+    if index != len(elements) - 1:
+        return ''
+    close_token = tokens[target.close_index]
+    if close_token.start[0] != elements[index].end_line:
+        return ''
+    return _close_suffix(lines, close_token)
+
+
+def _shifted_line_fits(line: str, old_col: int, new_col: int,
+                       max_line_length: int) -> bool:
+    """Return whether line fits after shifting indentation."""
+    if line[:old_col].strip():
+        return True
+    shifted_length = len(line) - old_col + new_col
+    return shifted_length <= max_line_length
+
+
+def _open_following_lines_fit(tokens: list[TokenInfo], target: Target,
+                              elements: list[Element], lines: list[str],
+                              max_line_length: int) -> bool:
+    """Return whether following lines fit after first element moves."""
+    open_token = tokens[target.open_index]
+    visual_col = open_token.end[1]
+    for element in elements[1:]:
+        if element.start_line == open_token.start[0]:
+            continue
+        line = _line_text(lines, element.start_line)
+        if not _shifted_line_fits(line, element.start_col, visual_col,
+                                  max_line_length):
+            return False
+    return True
+
+
 def _open_line_violation(tokens: list[TokenInfo], target: Target,
-                         elements: list[Element], max_line_length: int) \
+                         elements: list[Element], lines: list[str],
+                         max_line_length: int) \
         -> Optional[LayoutViolation]:
     """Return violation when the first element should be on the open line."""
     open_token = tokens[target.open_index]
     first = elements[0]
     if first.start_line == open_token.start[0] or first.text == '':
         return None
-    if not _fits_after(open_token.end[1], first.text, max_line_length):
+    added_text = first.text + _element_close_suffix(tokens, target, elements,
+                                                    lines, 0)
+    if not _fits_after(open_token.end[1], added_text, max_line_length):
+        return None
+    if not _open_following_lines_fit(tokens, target, elements, lines,
+                                     max_line_length):
         return None
     message = f'Put the first {target.kind} on the opening line.'
     line = open_token.start[0]
@@ -246,14 +295,18 @@ def _current_end_column(current: Element) -> int:
     return current.end_col
 
 
-def _more_fits_violations(target: Target, elements: list[Element],
+def _more_fits_violations(tokens: list[TokenInfo], target: Target,
+                          elements: list[Element], lines: list[str],
                           max_line_length: int) -> list[LayoutViolation]:
     """Return violations for arguments that fit on the previous line."""
     violations: list[LayoutViolation] = []
-    for current, next_element in zip(elements, elements[1:]):
+    element_pairs = zip(elements, elements[1:])
+    for index, (current, next_element) in enumerate(element_pairs, start=1):
         if current.end_line == next_element.start_line:
             continue
         added_text = _next_element_text(current, next_element)
+        added_text += _element_close_suffix(tokens, target, elements, lines,
+                                            index)
         if added_text == '':
             continue
         if not _fits_after(_current_end_column(current), added_text,
@@ -266,12 +319,6 @@ def _more_fits_violations(target: Target, elements: list[Element],
                                     message)
         violations.append(violation)
     return violations
-
-
-def _close_suffix(lines: list[str], close_token: TokenInfo) -> str:
-    """Return source text from the closing parenthesis to line end."""
-    line = _line_text(lines, close_token.start[0])
-    return line[close_token.start[1]:].rstrip()
 
 
 def _close_violation(tokens: list[TokenInfo], target: Target,
@@ -310,11 +357,11 @@ def _raw_violations(path: Path, source: str, max_line_length: int) \
         elements = _elements(tokens, target, lines)
         if not elements:
             continue
-        open_violation = _open_line_violation(tokens, target, elements,
+        open_violation = _open_line_violation(tokens, target, elements, lines,
                                               max_line_length)
         if open_violation is not None:
             violations.append(open_violation._replace(path=path))
-        for violation in _more_fits_violations(target, elements,
+        for violation in _more_fits_violations(tokens, target, elements, lines,
                                                max_line_length):
             violations.append(violation._replace(path=path))
         close_violation = _close_violation(tokens, target, elements, lines,

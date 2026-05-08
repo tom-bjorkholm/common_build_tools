@@ -37,10 +37,31 @@ def test_rejects_empty_open_call() -> None:
     assert _rules(source) == [layout.RULE_EMPTY_OPEN]
 
 
+def test_skips_open_for_long_indent() -> None:
+    """Test empty-open is skipped when visual indent would be too long."""
+    source = (
+        'def function_name_that_is_long(\n'
+        '        first_value_with_extra_words: int,\n'
+        '        second_value_with_long_annotation: dict[str, str]) -> None:\n'
+        '    pass\n'
+    )
+    assert _rules(source) == []
+
+
 def test_rejects_more_fits_call() -> None:
     """Test next argument must stay on previous line when it fits."""
     source = 'result = func(first,\n              second)\n'
     assert _rules(source) == [layout.RULE_MORE_FITS]
+
+
+def test_skips_move_for_long_suffix() -> None:
+    """Test more-fits is skipped when close suffix would make line long."""
+    source = (
+        'value = function_with_long_name(first_argument_with_padding,\n'
+        '                                second_argument_with_padding'
+        ').method_suffix()\n'
+    )
+    assert _rules(source) == []
 
 
 def test_rejects_more_fits_after_first_line() -> None:
