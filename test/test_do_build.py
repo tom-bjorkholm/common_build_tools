@@ -46,7 +46,9 @@ def _write_clean_lint_reports(report_paths: dict[str, Path]) -> None:
         encoding='utf-8'
     )
     report_paths['python_layout_log'].write_text(
-        'No python layout issues found.\n',
+        'No python layout issues found.\n'
+        '\n'
+        'No python-layout guidance messages.\n',
         encoding='utf-8'
     )
 
@@ -219,8 +221,36 @@ def test_run_python_layout_uses_filtered_folders(
                                          project_root=tmp_path)
     assert result == 0
     assert len(calls) == 1
+    assert '--max-name-length=32' in calls[0]
     assert str(included) in calls[0]
     assert str(excluded) not in calls[0]
+
+
+def test_python_layout_command_uses_guidance_settings() -> None:
+    """Test python-layout command includes configured guidance flags."""
+    spec = BuildSpec(python_layout_name_guidance_fails=True,
+                     python_layout_max_name_length=40)
+    command = do_build._python_layout_command(['python'], spec,
+                                              Path('checker.py'),
+                                              [Path('src')])
+    assert command == [
+        'python',
+        'checker.py',
+        '--max-name-length=40',
+        '--name-guidance-fails',
+        'src'
+    ]
+
+
+def test_python_layout_command_can_disable_name_guidance() -> None:
+    """Test python-layout command can disable long-name guidance."""
+    spec = BuildSpec(python_layout_name_guidance=False,
+                     python_layout_name_guidance_fails=True)
+    command = do_build._python_layout_command(['python'], spec,
+                                              Path('checker.py'),
+                                              [Path('src')])
+    assert '--no-name-guidance' in command
+    assert '--name-guidance-fails' not in command
 
 
 def test_pytest_cmd_flags(tmp_path: Path) -> None:
@@ -392,7 +422,7 @@ def test_reports_error_on_python_layout(
     )
     assert result == 1
     index_text = (report_dir / 'index.html').read_text(encoding='utf-8')
-    assert 'python-layout reported warnings.' in index_text
+    assert 'python-layout reported warnings or failing guidance.' in index_text
 
 
 def test_reports_sync_warnings(
@@ -773,7 +803,9 @@ def test_do_build_writes_reports_on_post_install_exception(
             encoding='utf-8'
         )
         report_paths['python_layout_log'].write_text(
-            'No python layout issues found.\n',
+            'No python layout issues found.\n'
+            '\n'
+            'No python-layout guidance messages.\n',
             encoding='utf-8'
         )
         return {'mypy': 0, 'flake8': 0, 'python_layout': 0}

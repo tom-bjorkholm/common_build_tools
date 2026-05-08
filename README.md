@@ -224,7 +224,18 @@ is `./common_build_tools/src/check_python_layout.py` and can be run directly
 with folders or files as arguments.
 
 The checker enforces compact multiline calls, function definitions and class
-base lists. Suppressions use comments modeled after pylint, for example:
+base lists. It also reports changed-line long-name guidance for function
+names, class names, parameter names, local variable names and global variable
+names. Import names and aliases are not checked.
+
+The name guidance uses `git diff HEAD`, so it includes staged and unstaged
+changes while avoiding old code that was not edited. Use
+`python_layout_name_guidance_fails` in `BuildSpec` to control if they
+fail the build, and `python_layout_max_name_length` to change the default
+limit of 32 characters.
+
+Suppressions for layout findings use comments modeled after pylint, for
+example:
 
 ```python
 # python-layout disable-next=empty-open

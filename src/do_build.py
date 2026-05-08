@@ -350,12 +350,28 @@ def _run_python_layout(venv_cmd: list[str], build_spec: BuildSpec,
         return 0
     checker = Path(__file__).with_name('check_python_layout.py')
     return run_command_logged(
-        [*venv_cmd, str(checker),
-         *[str(path) for path in folders]],
+        _python_layout_command(venv_cmd, build_spec, checker, folders),
         log_file=layout_log,
         check=False,
         cwd=project_root,
     )
+
+
+def _python_layout_command(venv_cmd: list[str], build_spec: BuildSpec,
+                           checker: Path, folders: list[Path]) -> list[str]:
+    """Return command for python-layout checker."""
+    command = [
+        *venv_cmd,
+        str(checker),
+        f'--max-name-length={build_spec.python_layout_max_name_length}'
+    ]
+    if not build_spec.python_layout_name_guidance:
+        command.append('--no-name-guidance')
+    if (build_spec.python_layout_name_guidance and
+            build_spec.python_layout_name_guidance_fails):
+        command.append('--name-guidance-fails')
+    command.extend(str(path) for path in folders)
+    return command
 
 
 def _run_linters(venv_cmd: list[str], build_information: BuildInformation,
@@ -587,7 +603,8 @@ def _build_failure_messages(
     layout_code = report_context.build_run_status.lint_codes.get(
         'python_layout')
     if layout_code not in (None, 0):
-        failure_messages.append('python-layout reported warnings.')
+        failure_messages.append(
+            'python-layout reported warnings or failing guidance.')
     if (report_context.build_run_status.pytest_code not in (None, 0) or
             pytest_failed):
         failure_messages.append('pytest reported failures or errors.')

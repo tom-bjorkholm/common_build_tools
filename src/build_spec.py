@@ -78,6 +78,15 @@ class BuildSpec(NamedTuple):
     python_layout_check: bool = True
     """If True run the common Python layout checker on flake8 folders."""
 
+    python_layout_name_guidance: bool = True
+    """If True report long-name guidance for changed lines."""
+
+    python_layout_name_guidance_fails: bool = False
+    """If True long-name guidance makes python-layout fail."""
+
+    python_layout_max_name_length: int = 32
+    """Maximum length used by python-layout long-name guidance."""
+
     readme_summary_max_skipped: int = 0
     """Update test summary in README if skipped tests <= this value."""
 

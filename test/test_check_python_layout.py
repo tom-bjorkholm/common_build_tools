@@ -18,6 +18,13 @@ def _rules(source: str) -> list[str]:
     ]
 
 
+def _guidance(source: str, changed_lines: set[int], max_len: int = 8) \
+        -> list[layout.NameGuidance]:
+    """Return long-name guidance for source."""
+    return layout.check_guidance_source(Path('sample.py'), source,
+                                        changed_lines, max_len)
+
+
 def test_accepts_compact_call() -> None:
     """Test compact calls have no violations."""
     source = 'result = func(first, second)\n'
@@ -105,3 +112,59 @@ def test_check_paths_reads_python_files(tmp_path: Path) -> None:
     assert [violation.rule for violation in violations] == [
         layout.RULE_EMPTY_OPEN
     ]
+
+
+def test_guidance_reports_names() -> None:
+    """Test changed-line guidance reports long names by kind."""
+    source = (
+        'long_global = 1\n'
+        'class LongClassName:\n'
+        '    pass\n'
+        'def long_function(long_parameter: int) -> None:\n'
+        '    long_local = long_parameter\n'
+    )
+    messages = _guidance(source, {1, 2, 4, 5})
+    assert [message.kind for message in messages] == [
+        'global variable name',
+        'class name',
+        'function name',
+        'parameter name',
+        'local variable name'
+    ]
+
+
+def test_guidance_changed_lines() -> None:
+    """Test unchanged long names do not produce guidance."""
+    source = (
+        'long_global = 1\n'
+        'def long_function() -> None:\n'
+        '    long_local = 1\n'
+    )
+    assert [message.kind for message in _guidance(source, {3})] == [
+        'local variable name'
+    ]
+
+
+def test_guidance_ignores_skipped() -> None:
+    """Test imports and conventional method parameters are ignored."""
+    source = (
+        'import module as long_import_alias\n'
+        'def method(self, cls) -> None:\n'
+        '    pass\n'
+    )
+    assert not _guidance(source, {1, 2}, max_len=10)
+
+
+def test_changed_lines_from_diff() -> None:
+    """Test changed line parser reads unified diff hunks."""
+    diff_text = (
+        'diff --git a/pkg.py b/pkg.py\n'
+        '--- a/pkg.py\n'
+        '+++ b/pkg.py\n'
+        '@@ -2,0 +3,2 @@\n'
+        '+first\n'
+        '+second\n'
+    )
+    assert layout.changed_lines_from_diff(diff_text) == {
+        Path('pkg.py'): {3, 4}
+    }
