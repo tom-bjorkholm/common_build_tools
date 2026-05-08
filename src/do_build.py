@@ -3,6 +3,7 @@
 
 # Copyright (c) 2026 Tom Björkholm
 # MIT License
+# pylint: disable=too-many-lines
 
 from datetime import datetime
 import html
@@ -43,6 +44,7 @@ PYTEST_LOG_NAME = 'pytest_log.txt'
 PYLINT_LOG_NAME = 'pylint_log.txt'
 FLAKE_LOG_NAME = 'flake8_log.txt'
 MYPY_LOG_NAME = 'mypy_errors.txt'
+PYTHON_LAYOUT_LOG_NAME = 'python_layout_log.txt'
 FLAKE_DIR_NAME = 'flake_report'
 MYPY_DIR_NAME = 'mypy_report'
 
@@ -53,6 +55,7 @@ REPORT_LINKS = [
     ('flake_report/index.html', 'flake8 report'),
     ('mypy_report/index.html', 'mypy report'),
     ('mypy_errors.txt', 'mypy errors'),
+    ('python_layout_log.txt', 'python layout log'),
     ('pylint_log.txt', 'pylint log'),
     ('build_log.txt', 'build log'),
     ('pytest_log.txt', 'pytest log'),
@@ -66,6 +69,7 @@ class ReportSummary(NamedTuple):
     test_summary: str
     flake8_clean: Optional[bool]
     mypy_clean: Optional[bool]
+    python_layout_clean: Optional[bool]
     python_version: str
     build_failed: bool
     failure_messages: list[str]
@@ -113,7 +117,7 @@ def _run_custom_hooks(hooks: Optional[list[CustomFunction]],
 def _initial_build_run_status() -> BuildRunStatus:
     """Return build run status before lint, pytest and pydoc have run."""
     return BuildRunStatus(
-        lint_codes={'mypy': None, 'flake8': None},
+        lint_codes={'mypy': None, 'flake8': None, 'python_layout': None},
         pytest_code=None,
         pydoc_code=None
     )
@@ -179,6 +183,7 @@ def _prepare_directories(
         'pylint_log': report_dir / PYLINT_LOG_NAME,
         'flake_log': report_dir / FLAKE_LOG_NAME,
         'mypy_log': report_dir / MYPY_LOG_NAME,
+        'python_layout_log': report_dir / PYTHON_LAYOUT_LOG_NAME,
         'flake_dir': report_dir / FLAKE_DIR_NAME,
         'mypy_dir': report_dir / MYPY_DIR_NAME,
     }
@@ -301,10 +306,62 @@ def _run_flake8(venv_cmd: list[str], build_information: BuildInformation,
     )
 
 
+def _is_python_layout_included(folder: Path,
+                               excluded_folders: list[Path]) -> bool:
+    """Return True when folder is outside every python-layout exclusion."""
+    for excluded_folder in excluded_folders:
+        try:
+            folder.relative_to(excluded_folder)
+            return False
+        except ValueError:
+            continue
+    return True
+
+
+def _python_layout_folders(build_spec: BuildSpec,
+                           build_information: BuildInformation,
+                           project_root: Path) -> list[Path]:
+    """Return flake8 folders after python-layout specific exclusions."""
+    excludes = build_spec.python_layout_exclude_folders
+    if excludes is None:
+        return list(build_information['flake8_folders'])
+    resolved_excludes = [
+        (project_root / path).resolve() for path in excludes
+    ]
+    return [
+        folder for folder in build_information['flake8_folders']
+        if _is_python_layout_included(folder.resolve(), resolved_excludes)
+    ]
+
+
+def _run_python_layout(venv_cmd: list[str], build_spec: BuildSpec,
+                       build_information: BuildInformation, layout_log: Path,
+                       project_root: Path) -> int:
+    """Run python-layout on discovered flake8 folders."""
+    if not build_spec.python_layout_check:
+        layout_log.write_text('Python layout check disabled.\n',
+                              encoding='utf-8')
+        return 0
+    folders = _python_layout_folders(build_spec, build_information,
+                                     project_root)
+    if not folders:
+        layout_log.write_text('No python layout targets discovered.\n',
+                              encoding='utf-8')
+        return 0
+    checker = Path(__file__).with_name('check_python_layout.py')
+    return run_command_logged(
+        [*venv_cmd, str(checker),
+         *[str(path) for path in folders]],
+        log_file=layout_log,
+        check=False,
+        cwd=project_root,
+    )
+
+
 def _run_linters(venv_cmd: list[str], build_information: BuildInformation,
-                 report_paths: dict[str, Path], project_root: Path) -> \
-        dict[str, int]:
-    """Run mypy and flake8 and return their exit codes."""
+                 report_paths: dict[str, Path], project_root: Path,
+                 build_spec: BuildSpec) -> dict[str, int]:
+    """Run mypy, flake8 and python-layout and return their exit codes."""
     mypy_code = _run_mypy(
         venv_cmd=venv_cmd,
         build_information=build_information,
@@ -319,9 +376,17 @@ def _run_linters(venv_cmd: list[str], build_information: BuildInformation,
         flake_dir=report_paths['flake_dir'],
         project_root=project_root
     )
+    python_layout_code = _run_python_layout(
+        venv_cmd=venv_cmd,
+        build_spec=build_spec,
+        build_information=build_information,
+        layout_log=report_paths['python_layout_log'],
+        project_root=project_root
+    )
     return {
         'mypy': mypy_code,
         'flake8': flake8_code,
+        'python_layout': python_layout_code,
     }
 
 
@@ -451,6 +516,19 @@ def _check_mypy_clean(report_paths: dict[str, Path]) -> Optional[bool]:
     return 'Success: no issues found' in content
 
 
+def _check_python_layout_clean(
+        report_paths: dict[str, Path]) -> Optional[bool]:
+    """Return python-layout status, or None if log was not generated."""
+    if not report_paths['python_layout_log'].exists():
+        return None
+    content = report_paths['python_layout_log'].read_text(encoding='utf-8')
+    if 'No python layout targets discovered.' in content:
+        return None
+    if 'Python layout check disabled.' in content:
+        return None
+    return 'No python layout issues found.' in content
+
+
 def _test_summary_text(test_summary: str) -> str:
     """Return display text for the pytest summary."""
     if test_summary:
@@ -476,6 +554,15 @@ def _mypy_summary_text(mypy_clean: Optional[bool]) -> str:
     return 'mypy report not available.'
 
 
+def _python_layout_summary_text(python_layout_clean: Optional[bool]) -> str:
+    """Return display text for the python-layout summary."""
+    if python_layout_clean is True:
+        return 'No python layout warnings.'
+    if python_layout_clean is False:
+        return 'Python layout warnings.'
+    return 'Python layout report not available.'
+
+
 def _build_failure_messages(
         report_context: ReportGenerationContext,
         pytest_failed: bool) -> list[str]:
@@ -497,6 +584,10 @@ def _build_failure_messages(
     mypy_code = report_context.build_run_status.lint_codes.get('mypy')
     if mypy_code not in (None, 0):
         failure_messages.append('mypy reported errors.')
+    layout_code = report_context.build_run_status.lint_codes.get(
+        'python_layout')
+    if layout_code not in (None, 0):
+        failure_messages.append('python-layout reported warnings.')
     if (report_context.build_run_status.pytest_code not in (None, 0) or
             pytest_failed):
         failure_messages.append('pytest reported failures or errors.')
@@ -520,6 +611,9 @@ def _missing_report_message(
             return 'not generated because build failed earlier'
     if href in ('flake_report/index.html', 'flake8_log.txt'):
         if build_run_status.lint_codes.get('flake8') is None:
+            return 'not generated because build failed earlier'
+    if href == 'python_layout_log.txt':
+        if build_run_status.lint_codes.get('python_layout') is None:
             return 'not generated because build failed earlier'
     if (href.startswith('pytest_report.html') or
             href in ('coverage/index.html', 'pylint_log.txt',
@@ -616,8 +710,11 @@ def _write_html_report(build_information: BuildInformation,
                        report_paths: dict[str, Path],
                        report_summary: ReportSummary) -> None:
     """Write reports/index.html summary page."""
+    # pylint: disable=too-many-locals
     now = datetime.now().astimezone()
     index_file = report_paths['report_dir'] / 'index.html'
+    layout_text = _python_layout_summary_text(
+        report_summary.python_layout_clean)
     with open(index_file, 'w', encoding='utf-8') as file_obj:
         file_obj.write('<!DOCTYPE html>\n<html>\n<head>\n')
         file_obj.write('  <meta charset="utf-8" />\n')
@@ -667,6 +764,11 @@ def _write_html_report(build_information: BuildInformation,
             f'{html.escape(_mypy_summary_text(report_summary.mypy_clean))}'
             '</p>\n'
         )
+        file_obj.write(
+            '<p>'
+            f'{html.escape(layout_text)}'
+            '</p>\n'
+        )
         if report_summary.repo_sync_warnings:
             file_obj.write('<h3>Repository synchronization warnings</h3>\n')
             file_obj.write('<ul>\n')
@@ -700,6 +802,8 @@ def _write_test_summary(report_paths: dict[str, Path],
                         report_summary: ReportSummary) -> Path:
     """Write reports/test_summary.md and return its path."""
     summary_file = report_paths['report_dir'] / 'test_summary.md'
+    layout_text = _python_layout_summary_text(
+        report_summary.python_layout_clean)
     with open(summary_file, 'w', encoding='utf-8') as file_obj:
         file_obj.write('## Test summary\n\n')
         file_obj.write(
@@ -711,6 +815,9 @@ def _write_test_summary(report_paths: dict[str, Path],
         )
         file_obj.write(
             f'- {_mypy_summary_text(report_summary.mypy_clean)}\n'
+        )
+        file_obj.write(
+            f'- {layout_text}\n'
         )
         file_obj.write(f'- Built version(s): {report_summary.version_text}\n')
         file_obj.write(
@@ -728,6 +835,8 @@ def _generate_reports(report_context: ReportGenerationContext) -> int:
     )
     flake8_clean = _check_flake8_clean(report_context.report_paths)
     mypy_clean = _check_mypy_clean(report_context.report_paths)
+    python_layout_clean = _check_python_layout_clean(
+        report_context.report_paths)
     version_text = _build_version_text(report_context.build_information)
     python_version = _get_python_version(
         venv_cmd=report_context.venv_cmd,
@@ -743,6 +852,7 @@ def _generate_reports(report_context: ReportGenerationContext) -> int:
         test_summary=pytest_summary,
         flake8_clean=flake8_clean,
         mypy_clean=mypy_clean,
+        python_layout_clean=python_layout_clean,
         python_version=python_version,
         build_failed=build_failed,
         failure_messages=failure_messages,
@@ -890,12 +1000,13 @@ def do_build(python_name: Optional[str] = None,
         current_phase = 'custom_before_test hooks'
         _run_custom_hooks(active_spec.custom_before_test, active_spec,
                           active_information)
-        current_phase = 'mypy and flake8'
+        current_phase = 'mypy, flake8 and python-layout'
         lint_codes = _run_linters(
             venv_cmd=venv_cmd,
             build_information=active_information,
             report_paths=report_paths,
-            project_root=project_root
+            project_root=project_root,
+            build_spec=active_spec
         )
         build_run_status = BuildRunStatus(
             lint_codes=lint_codes,

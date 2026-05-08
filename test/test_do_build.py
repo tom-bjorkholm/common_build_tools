@@ -31,9 +31,24 @@ def _report_paths(report_dir: Path, dist_dir: Path) -> dict[str, Path]:
         'pylint_log': report_dir / do_build.PYLINT_LOG_NAME,
         'flake_log': report_dir / do_build.FLAKE_LOG_NAME,
         'mypy_log': report_dir / do_build.MYPY_LOG_NAME,
+        'python_layout_log': report_dir / do_build.PYTHON_LAYOUT_LOG_NAME,
         'flake_dir': flake_dir,
         'mypy_dir': mypy_dir,
     }
+
+
+def _write_clean_lint_reports(report_paths: dict[str, Path]) -> None:
+    """Write clean mypy, flake8 and python-layout report files."""
+    report_paths['mypy_log'].write_text('Success: no issues found\n',
+                                        encoding='utf-8')
+    (report_paths['flake_dir'] / 'index.html').write_text(
+        'No flake8 errors found',
+        encoding='utf-8'
+    )
+    report_paths['python_layout_log'].write_text(
+        'No python layout issues found.\n',
+        encoding='utf-8'
+    )
 
 
 def _report_context(
@@ -51,6 +66,7 @@ def _report_context(
     resolved_lint_codes: dict[str, Optional[int]] = {
         'mypy': 0,
         'flake8': 0,
+        'python_layout': 0,
     }
     if lint_codes is not None:
         resolved_lint_codes = lint_codes
@@ -125,6 +141,86 @@ def test_pytest_folders_dedupe(tmp_path: Path) -> None:
     )
     folders = do_build._pytest_collection_folders(info)
     assert folders == [folder_a, folder_b]
+
+
+def test_python_layout_folders_use_flake8_by_default(tmp_path: Path) -> None:
+    """Test python-layout checks the same folders as flake8 by default."""
+    folder = tmp_path / 'src'
+    info = make_build_information(tmp_path)
+    info['flake8_folders'] = [folder]
+    folders = do_build._python_layout_folders(BuildSpec(), info, tmp_path)
+    assert folders == [folder]
+
+
+def test_python_layout_folders_can_be_excluded(tmp_path: Path) -> None:
+    """Test python-layout has its own folder exclusions."""
+    included = tmp_path / 'included'
+    excluded = tmp_path / 'excluded' / 'src'
+    info = make_build_information(tmp_path)
+    info['flake8_folders'] = [included, excluded]
+    spec = BuildSpec(python_layout_exclude_folders=[Path('excluded')])
+    assert do_build._python_layout_folders(spec, info, tmp_path) == [included]
+
+
+def test_run_python_layout_disabled(tmp_path: Path) -> None:
+    """Test disabled python-layout writes a status log and succeeds."""
+    info = make_build_information(tmp_path)
+    layout_log = tmp_path / 'python_layout_log.txt'
+    spec = BuildSpec(python_layout_check=False)
+    result = do_build._run_python_layout(venv_cmd=['python'], build_spec=spec,
+                                         build_information=info,
+                                         layout_log=layout_log,
+                                         project_root=tmp_path)
+    assert result == 0
+    assert layout_log.read_text(encoding='utf-8') == (
+        'Python layout check disabled.\n'
+    )
+
+
+def test_run_python_layout_no_targets(tmp_path: Path) -> None:
+    """Test python-layout succeeds when no folders are discovered."""
+    info = make_build_information(tmp_path)
+    layout_log = tmp_path / 'python_layout_log.txt'
+    result = do_build._run_python_layout(venv_cmd=['python'],
+                                         build_spec=BuildSpec(),
+                                         build_information=info,
+                                         layout_log=layout_log,
+                                         project_root=tmp_path)
+    assert result == 0
+    assert layout_log.read_text(encoding='utf-8') == (
+        'No python layout targets discovered.\n'
+    )
+
+
+def test_run_python_layout_uses_filtered_folders(
+        monkeypatch: pytest.MonkeyPatch,
+        tmp_path: Path) -> None:
+    """Test python-layout command receives flake8 folders after exclusions."""
+    included = tmp_path / 'included'
+    excluded = tmp_path / 'excluded' / 'src'
+    info = make_build_information(tmp_path)
+    info['flake8_folders'] = [included, excluded]
+    calls: list[list[str]] = []
+
+    def _run_command_logged(command: list[str], log_file: Path, check: bool,
+                            cwd: Path) -> int:
+        _ = log_file
+        _ = check
+        _ = cwd
+        calls.append(command)
+        return 0
+
+    monkeypatch.setattr(do_build, 'run_command_logged', _run_command_logged)
+    spec = BuildSpec(python_layout_exclude_folders=[Path('excluded')])
+    layout_log = tmp_path / 'python_layout_log.txt'
+    result = do_build._run_python_layout(venv_cmd=['python'], build_spec=spec,
+                                         build_information=info,
+                                         layout_log=layout_log,
+                                         project_root=tmp_path)
+    assert result == 0
+    assert len(calls) == 1
+    assert str(included) in calls[0]
+    assert str(excluded) not in calls[0]
 
 
 def test_pytest_cmd_flags(tmp_path: Path) -> None:
@@ -232,12 +328,7 @@ def test_reports_update_readmes(
         '=== 5 passed in 2.11s ===\n',
         encoding='utf-8'
     )
-    paths['mypy_log'].write_text('Success: no issues found\n',
-                                 encoding='utf-8')
-    (paths['flake_dir'] / 'index.html').write_text(
-        'No flake8 errors found',
-        encoding='utf-8'
-    )
+    _write_clean_lint_reports(paths)
     monkeypatch.setattr(do_build, '_get_python_version',
                         lambda **_kwargs: 'Python')
     result = do_build._generate_reports(
@@ -264,20 +355,44 @@ def test_reports_error_on_lint(
     paths = _report_paths(report_dir, dist_dir)
     paths['pytest_log'].write_text('=== 2 passed in 0.10s ===\n',
                                    encoding='utf-8')
-    (paths['flake_dir'] / 'index.html').write_text('No flake8 errors found',
-                                                   encoding='utf-8')
-    paths['mypy_log'].write_text('Success: no issues found\n',
-                                 encoding='utf-8')
+    _write_clean_lint_reports(paths)
     monkeypatch.setattr(do_build, '_get_python_version',
                         lambda **_kwargs: 'Python')
     result = do_build._generate_reports(
         report_context=_report_context(
             build_information=info,
             report_paths=paths,
-            lint_codes={'mypy': 1, 'flake8': 0}
+            lint_codes={'mypy': 1, 'flake8': 0, 'python_layout': 0}
         )
     )
     assert result == 1
+
+
+def test_reports_error_on_python_layout(
+        monkeypatch: pytest.MonkeyPatch,
+        tmp_path: Path) -> None:
+    """Test report generation fails when python-layout fails."""
+    info = make_build_information(tmp_path)
+    report_dir = tmp_path / 'reports'
+    report_dir.mkdir()
+    dist_dir = tmp_path / 'dist'
+    dist_dir.mkdir()
+    paths = _report_paths(report_dir, dist_dir)
+    paths['pytest_log'].write_text('=== 2 passed in 0.10s ===\n',
+                                   encoding='utf-8')
+    _write_clean_lint_reports(paths)
+    monkeypatch.setattr(do_build, '_get_python_version',
+                        lambda **_kwargs: 'Python')
+    result = do_build._generate_reports(
+        report_context=_report_context(
+            build_information=info,
+            report_paths=paths,
+            lint_codes={'mypy': 0, 'flake8': 0, 'python_layout': 1}
+        )
+    )
+    assert result == 1
+    index_text = (report_dir / 'index.html').read_text(encoding='utf-8')
+    assert 'python-layout reported warnings.' in index_text
 
 
 def test_reports_sync_warnings(
@@ -292,10 +407,7 @@ def test_reports_sync_warnings(
     paths = _report_paths(report_dir, dist_dir)
     paths['pytest_log'].write_text('=== 2 passed in 0.10s ===\n',
                                    encoding='utf-8')
-    (paths['flake_dir'] / 'index.html').write_text('No flake8 errors found',
-                                                   encoding='utf-8')
-    paths['mypy_log'].write_text('Success: no issues found\n',
-                                 encoding='utf-8')
+    _write_clean_lint_reports(paths)
     monkeypatch.setattr(do_build, '_get_python_version',
                         lambda **_kwargs: 'Python')
     warning_text = (
@@ -339,12 +451,7 @@ def test_reports_skip_limit(
         '=== 5 passed, 4 skipped in 2.11s ===\n',
         encoding='utf-8'
     )
-    paths['mypy_log'].write_text('Success: no issues found\n',
-                                 encoding='utf-8')
-    (paths['flake_dir'] / 'index.html').write_text(
-        'No flake8 errors found',
-        encoding='utf-8'
-    )
+    _write_clean_lint_reports(paths)
     monkeypatch.setattr(do_build, '_get_python_version',
                         lambda **_kwargs: 'Python')
     result = do_build._generate_reports(
@@ -379,12 +486,7 @@ def test_reports_skip_readmes_without_pytest_summary(
     dist_dir = tmp_path / 'dist'
     dist_dir.mkdir()
     paths = _report_paths(report_dir, dist_dir)
-    paths['mypy_log'].write_text('Success: no issues found\n',
-                                 encoding='utf-8')
-    (paths['flake_dir'] / 'index.html').write_text(
-        'No flake8 errors found',
-        encoding='utf-8'
-    )
+    _write_clean_lint_reports(paths)
     monkeypatch.setattr(do_build, '_get_python_version',
                         lambda **_kwargs: 'Python')
     result = do_build._generate_reports(
@@ -414,7 +516,11 @@ def test_reports_failure_banner_and_missing_reports(
         report_context=_report_context(
             build_information=info,
             report_paths=paths,
-            lint_codes={'mypy': None, 'flake8': None},
+            lint_codes={
+                'mypy': None,
+                'flake8': None,
+                'python_layout': None
+            },
             pytest_code=None,
             pydoc_code=None,
             build_failure=do_build.BuildFailure(
@@ -505,7 +611,7 @@ def test_do_build_runs_steps(
 
     def _run_linters(**_kwargs: object) -> dict[str, int]:
         events.append('linters')
-        return {'mypy': 0, 'flake8': 0}
+        return {'mypy': 0, 'flake8': 0, 'python_layout': 0}
 
     def _run_pytest(**_kwargs: object) -> int:
         events.append('pytest')
@@ -617,6 +723,7 @@ def test_do_build_pydoc_error(
     monkeypatch.setattr(do_build, '_run_linters', lambda **_kwargs: {
         'mypy': 0,
         'flake8': 0,
+        'python_layout': 0,
     })
     monkeypatch.setattr(do_build, '_run_pytest', lambda **_kwargs: 0)
     monkeypatch.setattr(do_build, '_run_pydoc_markdown',
@@ -665,7 +772,11 @@ def test_do_build_writes_reports_on_post_install_exception(
             'No flake8 errors found',
             encoding='utf-8'
         )
-        return {'mypy': 0, 'flake8': 0}
+        report_paths['python_layout_log'].write_text(
+            'No python layout issues found.\n',
+            encoding='utf-8'
+        )
+        return {'mypy': 0, 'flake8': 0, 'python_layout': 0}
 
     def _run_pytest(**kwargs: object) -> int:
         pytest_log = kwargs['pytest_log']

@@ -52,7 +52,7 @@ class BuildSpec(NamedTuple):
     7. Run `custom_before_install` hooks.
     8. Install built wheel packages in dependency order.
     9. Run `custom_before_test` hooks.
-    10. Run flake8 and mypy on discovered folders.
+    10. Run flake8, mypy and python-layout on discovered folders.
     11. Run pytest on discovered test and pylint folders.
     12. Run `custom_after_test` hooks.
     13. Run pydoc-markdown for
@@ -74,6 +74,9 @@ class BuildSpec(NamedTuple):
 
     mypy_on_test: bool = True
     """If True run mypy also on discovered `test` folders."""
+
+    python_layout_check: bool = True
+    """If True run the common Python layout checker on flake8 folders."""
 
     readme_summary_max_skipped: int = 0
     """Update test summary in README if skipped tests <= this value."""
@@ -113,6 +116,9 @@ class BuildSpec(NamedTuple):
 
     flake8_exclude_folders: Optional[list[Path]] = None
     """Folders to exclude from flake8 run."""
+
+    python_layout_exclude_folders: Optional[list[Path]] = None
+    """Folders to exclude from python-layout run."""
 
     pylint_exclude_folders: Optional[list[Path]] = None
     """Folders to exclude from pylint run."""

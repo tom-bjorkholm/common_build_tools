@@ -47,8 +47,8 @@ git submodule add -b master git@bitbucket.org:tom-bjorkholm/common_build_tools.g
 These common build tools are designed to be shared between a few projects
 that share some specific requirements. These requirements are:
 
-- pytest, pylint (inside pytest with pytest-pylint), flake8 and mypy are used
-  to check the code.
+- pytest, pylint (inside pytest with pytest-pylint), flake8, mypy and
+  python-layout are used to check the code.
 
 - each project is building one or more .whl files. The .whl files are configured
   by either a `pyproject.toml` file, a `setup.py` file or both.
@@ -96,8 +96,9 @@ Default folder discovery for linting and tests includes every `src` and
 `test` folder in the repository, including `custom_build_tools/src` and
 `custom_build_tools/test`. If those custom folders exist but are empty,
 exclude them in `custom_spec()` with `mypy_exclude_folders`,
-`flake8_exclude_folders`, `pylint_exclude_folders` and
-`pytest_exclude_folders` until they contain Python files.
+`flake8_exclude_folders`, `python_layout_exclude_folders`,
+`pylint_exclude_folders` and `pytest_exclude_folders` until they contain
+Python files.
 
 ### The build flow
 
@@ -140,9 +141,11 @@ build flow are (from a user's point of view):
    If `custom_before_test` hooks are configured in the `BuildSpec` they
    are run.
 
-10. Run flake8 and mypy on discovered folders, with the virtual
-    environment (venv) active. (This means that imports from the
-    installed packages are working.)
+10. Run flake8, mypy and python-layout on discovered folders, with the
+    virtual environment (venv) active. (This means that imports from the
+    installed packages are working.) By default python-layout checks the
+    same folders as flake8, but `python_layout_exclude_folders` can be used
+    for temporary rollout exclusions.
 
 11. Run pytest on discovered test and pylint folders, with the virtual
     environment (venv) active.
@@ -211,7 +214,27 @@ performed.
 
 #### Tests in build
 
-The "testing" includes flake8, mypy and pytest with pytest-pylint.
+The "testing" includes flake8, mypy, python-layout and pytest with
+pytest-pylint.
+
+#### python-layout
+
+The build step is reported as `python-layout`. The standalone checker script
+is `./common_build_tools/src/check_python_layout.py` and can be run directly
+with folders or files as arguments.
+
+The checker enforces compact multiline calls, function definitions and class
+base lists. Suppressions use comments modeled after pylint, for example:
+
+```python
+# python-layout disable-next=empty-open
+value = func(
+    argument)
+```
+
+The rule names are `empty-open`, `more-fits` and `empty-close`. The name `all`
+can be used when a line intentionally needs to suppress all python-layout
+rules.
 
 After running `run_build.py` you can open `./reports/index.html` to see all
 test reports.

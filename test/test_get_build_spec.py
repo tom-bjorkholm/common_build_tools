@@ -17,6 +17,8 @@ def test_default_spec_values() -> None:
     assert default_spec.package_folders is None
     assert default_spec.identical_versions is True
     assert default_spec.mypy_on_test is True
+    assert default_spec.python_layout_check is True
+    assert default_spec.python_layout_exclude_folders is None
     assert default_spec.custom_final is None
 
 
