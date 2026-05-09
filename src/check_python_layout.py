@@ -255,12 +255,13 @@ def _open_following_lines_fit(tokens: list[TokenInfo], target: Target,
     """Return whether following lines fit after first element moves."""
     open_token = tokens[target.open_index]
     visual_col = open_token.end[1]
-    for element in elements[1:]:
-        if element.start_line == open_token.start[0]:
+    old_col = elements[0].start_col
+    close_token = tokens[target.close_index]
+    for line_number in range(elements[0].start_line, close_token.start[0] + 1):
+        line = _line_text(lines, line_number)
+        if not line.strip():
             continue
-        line = _line_text(lines, element.start_line)
-        if not _shifted_line_fits(line, element.start_col, visual_col,
-                                  max_line_length):
+        if not _shifted_line_fits(line, old_col, visual_col, max_line_length):
             return False
     return True
 
@@ -289,6 +290,8 @@ def _open_line_violation(tokens: list[TokenInfo], target: Target,
     open_token = tokens[target.open_index]
     first = elements[0]
     if first.start_line == open_token.start[0] or first.text == '':
+        return None
+    if any(element.text == '' for element in elements[1:]):
         return None
     added_text = _element_move_text(first)
     added_text += _element_close_suffix(tokens, target, elements, lines, 0)
@@ -332,6 +335,11 @@ def _more_fits_violations(tokens: list[TokenInfo], target: Target,
     element_pairs = zip(elements, elements[1:])
     for index, (current, next_element) in enumerate(element_pairs, start=1):
         if current.end_line == next_element.start_line:
+            continue
+        if current.text == '' or next_element.text == '':
+            continue
+        if '#' in _line_text(lines, current.end_line)[
+                _current_end_column(current):]:
             continue
         added_text = _next_element_text(current, next_element)
         if added_text == '':

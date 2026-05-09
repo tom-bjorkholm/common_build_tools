@@ -25,7 +25,8 @@ def _wrapper_content(target_script_name: str) -> str:
         'sys.path.insert(0, str(Path(__file__).parent / '
         "'common_build_tools' / 'src'))\n"
         f'from {target_script_name} import {target_script_name}_cmd  '
-        '# pylint: disable=wrong-import-position # noqa: E402\n\n\n'
+        # pylint: disable-next=wrong-import-position
+        '  # noqa: E402\n\n\n'
         "if __name__ == '__main__':\n"
         f'    {target_script_name}_cmd()\n'
     )

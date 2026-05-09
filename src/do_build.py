@@ -321,7 +321,8 @@ def _generate_reports_after_failure(
     """Best-effort report generation for failures after wheel install."""
     try:
         _ = _generate_reports(report_context=report_context)
-    except Exception:  # pylint: disable=broad-exception-caught
+    # pylint: disable-next=broad-exception-caught
+    except Exception:
         _append_traceback_to_build_log(
             project_root=report_context.build_information['project_root'],
             report_paths=report_context.report_paths)
