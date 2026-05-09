@@ -19,7 +19,7 @@ def test_default_spec_values() -> None:
     assert default_spec.mypy_on_test is True
     assert default_spec.python_layout_check is True
     assert default_spec.python_layout_name_guidance is True
-    assert default_spec.python_layout_name_guidance_fails is False
+    assert default_spec.python_layout_name_guidance_fails is True
     assert default_spec.python_layout_max_name_length == 32
     assert default_spec.python_layout_exclude_folders is None
     assert default_spec.custom_final is None

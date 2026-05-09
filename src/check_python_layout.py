@@ -769,11 +769,12 @@ def _format_violation(violation: LayoutViolation) -> str:
     )
 
 
-def _format_guidance(guidance: NameGuidance) -> str:
+def _format_guidance(guidance: NameGuidance, name_guidance_fails: bool) -> str:
     """Return one human-readable long-name guidance line."""
+    guidance_word = 'failure' if name_guidance_fails else 'guidance'
     return (
         f'{guidance.path}:{guidance.line}:{guidance.column}: '
-        f'python-layout long-name guidance: {guidance.kind} is '
+        f'python-layout long-name {guidance_word}: {guidance.kind} is '
         f'{guidance.name_length} chars; consider <= {guidance.max_length}'
     )
 
@@ -833,7 +834,8 @@ def _print_layout_section(violations: list[LayoutViolation]) -> None:
 
 
 def _print_guidance_section(guidance: list[NameGuidance],
-                            guidance_enabled: bool) -> None:
+                            guidance_enabled: bool,
+                            name_guidance_fails: bool) -> None:
     """Print guidance section of checker output."""
     print()
     if not guidance_enabled:
@@ -843,7 +845,8 @@ def _print_guidance_section(guidance: list[NameGuidance],
         print('No python-layout guidance messages.')
         return
     for message in guidance:
-        print(_format_guidance(message))
+        print(_format_guidance(message,
+                               name_guidance_fails=name_guidance_fails))
 
 
 def main(args: Optional[list[str]] = None) -> int:
@@ -863,7 +866,8 @@ def main(args: Optional[list[str]] = None) -> int:
     if guidance_enabled:
         guidance = check_guidance_paths(paths, parsed_args.max_name_length)
     _print_layout_section(violations)
-    _print_guidance_section(guidance, guidance_enabled)
+    _print_guidance_section(guidance, guidance_enabled,
+                            parsed_args.name_guidance_fails)
     if violations:
         return 1
     if guidance and parsed_args.name_guidance_fails:

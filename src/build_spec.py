@@ -81,7 +81,7 @@ class BuildSpec(NamedTuple):
     python_layout_name_guidance: bool = True
     """If True report long-name guidance for changed lines."""
 
-    python_layout_name_guidance_fails: bool = False
+    python_layout_name_guidance_fails: bool = True
     """If True long-name guidance makes python-layout fail."""
 
     python_layout_max_name_length: int = 32
