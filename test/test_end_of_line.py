@@ -20,15 +20,11 @@ from end_of_line import (  # noqa: E402
 )
 
 
-@pytest.mark.parametrize(
-    'source_bytes, expected_bytes',
-    [
+@pytest.mark.parametrize('source_bytes, expected_bytes', [
         (b'line1\r\nline2\r\n', b'line1\nline2\n'),
         (b'line1\nline2\n', b'line1\nline2\n'),
-    ]
-)
-def test_dos2unix_in_place(source_bytes: bytes,
-                           expected_bytes: bytes) -> None:
+    ])
+def test_dos2unix_in_place(source_bytes: bytes, expected_bytes: bytes) -> None:
     """Test dos2unix in-place conversion."""
     with TemporaryDirectory() as tmp_dir:
         file_path = Path(tmp_dir) / 'sample.txt'
@@ -112,8 +108,7 @@ def test_eol_command_missing_file(capsys: pytest.CaptureFixture[str]) -> None:
     assert 'Error:' in err
 
 
-def test_eol_cmd_bad_args(
-        capsys: pytest.CaptureFixture[str]) -> None:
+def test_eol_cmd_bad_args(capsys: pytest.CaptureFixture[str]) -> None:
     """Test eol_command returns failure for invalid arguments."""
     exit_code = eol_command(['not-a-command'])
     assert exit_code == 1

@@ -25,16 +25,14 @@ def test_default_spec_values() -> None:
     assert default_spec.custom_final is None
 
 
-def test_get_spec_default_none(
-        monkeypatch: pytest.MonkeyPatch) -> None:
+def test_get_spec_default_none(monkeypatch: pytest.MonkeyPatch) -> None:
     """Test get_build_spec falls back to default when custom returns None."""
     monkeypatch.setattr(get_build_spec, 'custom_spec', lambda: None)
     resolved = get_build_spec.get_build_spec()
     assert resolved == BuildSpec()
 
 
-def test_get_spec_custom(
-        monkeypatch: pytest.MonkeyPatch) -> None:
+def test_get_spec_custom(monkeypatch: pytest.MonkeyPatch) -> None:
     """Test get_build_spec returns valid BuildSpec from custom_spec."""
     custom = BuildSpec(identical_versions=False, mypy_on_test=False)
     monkeypatch.setattr(get_build_spec, 'custom_spec', lambda: custom)
@@ -42,9 +40,8 @@ def test_get_spec_custom(
     assert resolved == custom
 
 
-def test_get_spec_bad_type(
-        monkeypatch: pytest.MonkeyPatch,
-        capsys: pytest.CaptureFixture[str]) -> None:
+def test_get_spec_bad_type(monkeypatch: pytest.MonkeyPatch,
+                           capsys: pytest.CaptureFixture[str]) -> None:
     """Test get_build_spec prints error and returns default on bad type."""
     monkeypatch.setattr(get_build_spec, 'custom_spec', lambda: 'invalid')
     resolved = get_build_spec.get_build_spec()

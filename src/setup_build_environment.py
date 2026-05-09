@@ -162,8 +162,7 @@ def setup_build_environment_cmd(build_spec: Optional[BuildSpec]
                                 = None) -> None:
     """Run setup build environment command."""
     python_name = extract_python_name(sys.argv[1:])
-    setup_build_environment(python_name, False,
-                            build_spec, build_information)
+    setup_build_environment(python_name, False, build_spec, build_information)
     sys.exit(0)
 
 

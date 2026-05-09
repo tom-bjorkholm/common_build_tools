@@ -66,10 +66,8 @@ def _create_placeholder_python_file(custom_folder_path: Path,
                                     folder_name: str) -> None:
     """Create a placeholder Python file in newly created custom folder."""
     placeholder_path = custom_folder_path / '__init__.py'
-    placeholder_path.write_text(
-        CUSTOM_FOLDER_PLACEHOLDER_CONTENT[folder_name],
-        encoding='utf-8'
-    )
+    placeholder_path.write_text(CUSTOM_FOLDER_PLACEHOLDER_CONTENT[folder_name],
+                                encoding='utf-8')
 
 
 def create_custom_folder_structure(root_path: Path) -> None:
@@ -83,8 +81,7 @@ def create_custom_folder_structure(root_path: Path) -> None:
             custom_build_tools_dir_path.mkdir()
             _create_placeholder_python_file(
                 custom_folder_path=custom_build_tools_dir_path,
-                folder_name=folder_name
-            )
+                folder_name=folder_name)
     custom_spec_path: Path = custom_build_tools_path / 'custom_spec.py'
     if not custom_spec_path.exists():
         custom_spec_path.write_text(CUSTOM_BUILD_TOOLS_SPEC_CONTENT,

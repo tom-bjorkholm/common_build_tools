@@ -12,9 +12,8 @@ from build_spec import BuildSpec
 from common_build_tools.test.helpers import make_build_information
 
 
-def test_clean_build_step_order(
-        monkeypatch: pytest.MonkeyPatch,
-        tmp_path: Path) -> None:
+def test_clean_build_step_order(monkeypatch: pytest.MonkeyPatch,
+                                tmp_path: Path) -> None:
     """Test clean_build calls clean, setup, then do_build in order."""
     info = make_build_information(tmp_path)
     events: list[str] = []
@@ -36,18 +35,15 @@ def test_clean_build_step_order(
     monkeypatch.setattr(clean_build, 'clean', _fake_clean)
     monkeypatch.setattr(clean_build, 'setup_build_environment', _fake_setup)
     monkeypatch.setattr(clean_build, 'do_build', _fake_do_build)
-    result = clean_build.clean_build(
-        python_name='python3.13',
-        build_spec=BuildSpec(),
-        build_information=info
-    )
+    result = clean_build.clean_build(python_name='python3.13',
+                                     build_spec=BuildSpec(),
+                                     build_information=info)
     assert result == 0
     assert events == ['exit_check', 'clean', 'setup', 'build']
 
 
-def test_clean_build_gets_spec_info(
-        monkeypatch: pytest.MonkeyPatch,
-        tmp_path: Path) -> None:
+def test_clean_build_gets_spec_info(monkeypatch: pytest.MonkeyPatch,
+                                    tmp_path: Path) -> None:
     """Test clean_build discovers BuildSpec and BuildInformation if omitted."""
     info = make_build_information(tmp_path)
     spec = BuildSpec()
@@ -65,13 +61,12 @@ def test_clean_build_gets_spec_info(
     assert clean_build.clean_build() == 0
 
 
-def test_clean_build_cmd_code(
-        monkeypatch: pytest.MonkeyPatch) -> None:
+def test_clean_build_cmd_code(monkeypatch: pytest.MonkeyPatch) -> None:
     """Test clean_build_cmd exits with the code from clean_build."""
     monkeypatch.setattr(clean_build, 'extract_python_name',
                         lambda _args: 'python3.12')
-    monkeypatch.setattr(clean_build, 'clean_build',
-                        lambda *_args, **_kwargs: 3)
+    monkeypatch.setattr(clean_build, 'clean_build', lambda *_args,
+                        **_kwargs: 3)
     with pytest.raises(SystemExit) as exc_info:
         clean_build.clean_build_cmd()
     assert exc_info.value.code == 3

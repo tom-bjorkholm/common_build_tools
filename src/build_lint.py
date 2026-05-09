@@ -26,9 +26,7 @@ def _run_mypy(venv_cmd: list[str], build_information: BuildInformation,
                                str(mypy_dir),
                                *[str(path) for path in
                                  build_information['mypy_folders']]],
-                              log_file=mypy_log,
-                              check=False,
-                              cwd=project_root,
+                              log_file=mypy_log, check=False, cwd=project_root,
                               env=environment)
 
 
@@ -43,8 +41,7 @@ def _run_flake8(venv_cmd: list[str], build_information: BuildInformation,
                                f'--htmldir={flake_dir}',
                                *[str(path) for path in
                                  build_information['flake8_folders']]],
-                              log_file=flake_log,
-                              check=False,
+                              log_file=flake_log, check=False,
                               cwd=project_root)
 
 
@@ -91,9 +88,7 @@ def _run_python_layout(venv_cmd: list[str], build_spec: BuildSpec,
     checker = Path(__file__).with_name('check_python_layout.py')
     return run_command_logged(
         _python_layout_command(venv_cmd, build_spec, checker, folders),
-        log_file=layout_log,
-        check=False,
-        cwd=project_root)
+        log_file=layout_log, check=False, cwd=project_root)
 
 
 def _python_layout_command(venv_cmd: list[str], build_spec: BuildSpec,
@@ -117,21 +112,18 @@ def _run_linters(venv_cmd: list[str], build_information: BuildInformation,
                  report_paths: dict[str, Path], project_root: Path,
                  build_spec: BuildSpec) -> dict[str, int]:
     """Run mypy, flake8 and python-layout and return their exit codes."""
-    mypy_code = _run_mypy(
-        venv_cmd=venv_cmd,
-        build_information=build_information,
-        mypy_log=report_paths['mypy_log'],
-        mypy_dir=report_paths['mypy_dir'],
-        project_root=project_root)
-    flake8_code = _run_flake8(
-        venv_cmd=venv_cmd,
-        build_information=build_information,
-        flake_log=report_paths['flake_log'],
-        flake_dir=report_paths['flake_dir'],
-        project_root=project_root)
+    mypy_code = _run_mypy(venv_cmd=venv_cmd,
+                          build_information=build_information,
+                          mypy_log=report_paths['mypy_log'],
+                          mypy_dir=report_paths['mypy_dir'],
+                          project_root=project_root)
+    flake8_code = _run_flake8(venv_cmd=venv_cmd,
+                              build_information=build_information,
+                              flake_log=report_paths['flake_log'],
+                              flake_dir=report_paths['flake_dir'],
+                              project_root=project_root)
     python_layout_code = _run_python_layout(
-        venv_cmd=venv_cmd,
-        build_spec=build_spec,
+        venv_cmd=venv_cmd, build_spec=build_spec,
         build_information=build_information,
         layout_log=report_paths['python_layout_log'],
         project_root=project_root)

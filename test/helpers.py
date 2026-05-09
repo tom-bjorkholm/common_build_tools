@@ -9,8 +9,7 @@ from pathlib import Path
 from build_spec import BuildInformation, PackageInformation
 
 
-def make_package_information(package_folder: Path,
-                             name: str = 'pkg',
+def make_package_information(package_folder: Path, name: str = 'pkg',
                              version: str = '1.0.0',
                              dependencies: list[str] | None = None,
                              normalized_name: str | None = None) -> \
@@ -20,17 +19,11 @@ def make_package_information(package_folder: Path,
     normalized = normalized_name
     if normalized is None:
         normalized = name.strip().lower().replace('-', '_')
-    return PackageInformation(
-        name=name,
-        normalized_name=normalized,
-        version=version,
-        dependencies=deps,
-        package_folder=package_folder,
-        setup_file=None,
-        pyproject_file=None,
-        src_folder=None,
-        test_folder=None,
-    )
+    return PackageInformation(name=name, normalized_name=normalized,
+                              version=version, dependencies=deps,
+                              package_folder=package_folder, setup_file=None,
+                              pyproject_file=None, src_folder=None,
+                              test_folder=None,)
 
 
 def make_build_information(project_root: Path,
@@ -39,12 +32,7 @@ def make_build_information(project_root: Path,
     """Create BuildInformation with empty folder lists by default."""
     packages = [] if package_information is None else list(package_information)
     return BuildInformation(
-        project_root=project_root,
-        package_information=packages,
+        project_root=project_root, package_information=packages,
         package_install_order=[item['name'] for item in packages],
-        flake8_folders=[],
-        pylint_folders=[],
-        mypy_folders=[],
-        pytest_folders=[],
-        mypy_path_folders=[],
-    )
+        flake8_folders=[], pylint_folders=[], mypy_folders=[],
+        pytest_folders=[], mypy_path_folders=[],)

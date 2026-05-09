@@ -45,27 +45,22 @@ def _write_clean_lint_reports(report_paths: dict[str, Path]) -> None:
     report_paths['mypy_log'].write_text('Success: no issues found\n',
                                         encoding='utf-8')
     (report_paths['flake_dir'] / 'index.html').write_text(
-        'No flake8 errors found',
-        encoding='utf-8'
-    )
+        'No flake8 errors found', encoding='utf-8')
     report_paths['python_layout_log'].write_text(
         'No python layout issues found.\n'
         '\n'
-        'No python-layout guidance messages.\n',
-        encoding='utf-8'
-    )
+        'No python-layout guidance messages.\n', encoding='utf-8')
 
 
-def _report_context(
-        build_information: BuildInformation,
-        report_paths: dict[str, Path],
-        readme_summary_max_skipped: int = 0,
-        lint_codes: Optional[dict[str, Optional[int]]] = None,
-        pytest_code: Optional[int] = 0,
-        pydoc_code: Optional[int] = 0,
-        build_failure: Optional[build_reports.BuildFailure] = None,
-        repo_sync_warnings: Optional[list[str]] = None
-) -> build_reports.ReportGenerationContext:
+def _report_context(build_information: BuildInformation,
+                    report_paths: dict[str, Path],
+                    readme_summary_max_skipped: int = 0,
+                    lint_codes: Optional[dict[str, Optional[int]]] = None,
+                    pytest_code: Optional[int] = 0,
+                    pydoc_code: Optional[int] = 0,
+                    build_failure: Optional[build_reports.BuildFailure] = None,
+                    repo_sync_warnings: Optional[list[str]] = None) \
+        -> build_reports.ReportGenerationContext:
     """Create report context used by do_build report generation tests."""
     # pylint: disable=too-many-arguments,too-many-positional-arguments
     resolved_lint_codes: dict[str, Optional[int]] = {
@@ -81,18 +76,12 @@ def _report_context(
     return build_reports.ReportGenerationContext(
         build_information=build_information,
         build_spec=BuildSpec(
-            readme_summary_max_skipped=readme_summary_max_skipped
-        ),
-        report_paths=report_paths,
-        venv_cmd=['venv/bin/python'],
+            readme_summary_max_skipped=readme_summary_max_skipped),
+        report_paths=report_paths, venv_cmd=['venv/bin/python'],
         build_run_status=build_reports.BuildRunStatus(
-            lint_codes=resolved_lint_codes,
-            pytest_code=pytest_code,
-            pydoc_code=pydoc_code
-        ),
-        build_failure=build_failure,
-        repo_sync_warnings=resolved_repo_sync_warnings,
-    )
+            lint_codes=resolved_lint_codes, pytest_code=pytest_code,
+            pydoc_code=pydoc_code), build_failure=build_failure,
+        repo_sync_warnings=resolved_repo_sync_warnings,)
 
 
 def test_wheel_regex_dash_uscore() -> None:
@@ -114,10 +103,8 @@ def test_find_wheel_latest(tmp_path: Path) -> None:
     """Test _find_wheel returns lexicographically latest matching wheel."""
     dist_dir = tmp_path / 'dist'
     dist_dir.mkdir()
-    (dist_dir / 'pkg-1.0.0-py3-none-any.whl').write_text('a',
-                                                         encoding='utf-8')
-    (dist_dir / 'pkg-1.0.1-py3-none-any.whl').write_text('b',
-                                                         encoding='utf-8')
+    (dist_dir / 'pkg-1.0.0-py3-none-any.whl').write_text('a', encoding='utf-8')
+    (dist_dir / 'pkg-1.0.1-py3-none-any.whl').write_text('b', encoding='utf-8')
     wheel = do_build._find_wheel(dist_dir=dist_dir, package_name='pkg')
     assert wheel.name == 'pkg-1.0.1-py3-none-any.whl'
 
@@ -134,16 +121,11 @@ def test_pytest_folders_dedupe(tmp_path: Path) -> None:
     """Test pytest collection folder list preserves order and removes dupes."""
     folder_a = tmp_path / 'a'
     folder_b = tmp_path / 'b'
-    info = BuildInformation(
-        project_root=tmp_path,
-        package_information=[],
-        package_install_order=[],
-        flake8_folders=[],
-        pylint_folders=[folder_a, folder_b],
-        mypy_folders=[],
-        pytest_folders=[folder_a],
-        mypy_path_folders=[],
-    )
+    info = BuildInformation(project_root=tmp_path, package_information=[],
+                            package_install_order=[], flake8_folders=[],
+                            pylint_folders=[folder_a, folder_b],
+                            mypy_folders=[], pytest_folders=[folder_a],
+                            mypy_path_folders=[],)
     folders = do_build._pytest_collection_folders(info)
     assert folders == [folder_a, folder_b]
 
@@ -200,8 +182,7 @@ def test_run_python_layout_no_targets(tmp_path: Path) -> None:
 
 
 def test_run_python_layout_uses_filtered_folders(
-        monkeypatch: pytest.MonkeyPatch,
-        tmp_path: Path) -> None:
+        monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     """Test python-layout command receives flake8 folders after exclusions."""
     included = tmp_path / 'included'
     excluded = tmp_path / 'excluded' / 'src'
@@ -217,8 +198,7 @@ def test_run_python_layout_uses_filtered_folders(
         calls.append(command)
         return 0
 
-    monkeypatch.setattr(build_lint, 'run_command_logged',
-                        _run_command_logged)
+    monkeypatch.setattr(build_lint, 'run_command_logged', _run_command_logged)
     spec = BuildSpec(python_layout_exclude_folders=[Path('excluded')])
     layout_log = tmp_path / 'python_layout_log.txt'
     result = build_lint._run_python_layout(venv_cmd=['python'],
@@ -264,10 +244,8 @@ def test_pytest_cmd_flags(tmp_path: Path) -> None:
     """Test constructed pytest command includes report and coverage flags."""
     package_folder = tmp_path / 'pkg-one'
     package_folder.mkdir(parents=True, exist_ok=True)
-    package = make_package_information(
-        package_folder=package_folder,
-        name='pkg-one'
-    )
+    package = make_package_information(package_folder=package_folder,
+                                       name='pkg-one')
     info = make_build_information(tmp_path, [package])
     info['pytest_folders'] = [tmp_path / 'test']
     info['pylint_folders'] = [tmp_path / 'src']
@@ -288,9 +266,7 @@ def test_parse_summary_latest(tmp_path: Path) -> None:
     log_file = tmp_path / 'pytest_log.txt'
     log_file.write_text(
         'line one\n'
-        '===== 2 failed, 10 passed in 1.23s =====\n',
-        encoding='utf-8'
-    )
+        '===== 2 failed, 10 passed in 1.23s =====\n', encoding='utf-8')
     summary, skipped, failed = build_reports._parse_pytest_summary(log_file)
     assert summary == '2 failed, 10 passed in 1s'
     assert skipped == 0
@@ -300,8 +276,7 @@ def test_parse_summary_latest(tmp_path: Path) -> None:
 def test_parse_summary_missing(tmp_path: Path) -> None:
     """Test pytest summary parser handles missing log file."""
     summary, skipped, failed = build_reports._parse_pytest_summary(
-        tmp_path / 'missing.log'
-    )
+        tmp_path / 'missing.log')
     assert summary == ''
     assert skipped == 0
     assert failed is False
@@ -312,45 +287,34 @@ def test_parse_summary_skipped(tmp_path: Path) -> None:
     log_file = tmp_path / 'pytest_log.txt'
     log_file.write_text(
         'line one\n'
-        '===== 10 passed, 4 skipped in 1.23s =====\n',
-        encoding='utf-8'
-    )
+        '===== 10 passed, 4 skipped in 1.23s =====\n', encoding='utf-8')
     summary, skipped, failed = build_reports._parse_pytest_summary(log_file)
     assert summary == '10 passed, 4 skipped in 1s'
     assert skipped == 4
     assert failed is False
 
 
-def test_replace_summary_block(
-        tmp_path: Path) -> None:
+def test_replace_summary_block(tmp_path: Path) -> None:
     """Test README summary block replacement keeps text before heading."""
     readme_path = tmp_path / 'README.md'
     summary_path = tmp_path / 'summary.md'
-    readme_path.write_text(
-        '# Title\n\ntext\n\n## Test summary\nold line\n',
-        encoding='utf-8'
-    )
-    summary_path.write_text('## Test summary\n\nnew line\n',
-                            encoding='utf-8')
-    build_reports._replace_test_summary_in_readme(
-        readme_path=readme_path,
-        summary_path=summary_path
-    )
+    readme_path.write_text('# Title\n\ntext\n\n## Test summary\nold line\n',
+                           encoding='utf-8')
+    summary_path.write_text('## Test summary\n\nnew line\n', encoding='utf-8')
+    build_reports._replace_test_summary_in_readme(readme_path=readme_path,
+                                                  summary_path=summary_path)
     content = readme_path.read_text(encoding='utf-8')
     assert 'old line' not in content
     assert 'new line' in content
 
 
-def test_reports_update_readmes(
-        monkeypatch: pytest.MonkeyPatch,
-        tmp_path: Path) -> None:
+def test_reports_update_readmes(monkeypatch: pytest.MonkeyPatch,
+                                tmp_path: Path) -> None:
     """Test report generation writes outputs and updates README summaries."""
     package_folder = tmp_path / 'pkg-one'
     package_folder.mkdir(parents=True, exist_ok=True)
-    package = make_package_information(
-        package_folder=package_folder,
-        name='pkg-one'
-    )
+    package = make_package_information(package_folder=package_folder,
+                                       name='pkg-one')
     package_readme = package['package_folder'] / 'README_pypi.md'
     package_readme.write_text('# package\n', encoding='utf-8')
     root_readme = tmp_path / 'README.md'
@@ -361,28 +325,22 @@ def test_reports_update_readmes(
     dist_dir = tmp_path / 'dist'
     dist_dir.mkdir()
     paths = _report_paths(report_dir, dist_dir)
-    paths['pytest_log'].write_text(
-        '=== 5 passed in 2.11s ===\n',
-        encoding='utf-8'
-    )
+    paths['pytest_log'].write_text('=== 5 passed in 2.11s ===\n',
+                                   encoding='utf-8')
     _write_clean_lint_reports(paths)
     monkeypatch.setattr(build_reports, '_get_python_version',
                         lambda **_kwargs: 'Python')
     result = build_reports._generate_reports(
-        report_context=_report_context(
-            build_information=info,
-            report_paths=paths
-        )
-    )
+        report_context=_report_context(build_information=info,
+                                       report_paths=paths))
     assert result == 0
     assert (report_dir / 'index.html').exists()
     assert '## Test summary' in root_readme.read_text(encoding='utf-8')
     assert '## Test summary' in package_readme.read_text(encoding='utf-8')
 
 
-def test_reports_error_on_lint(
-        monkeypatch: pytest.MonkeyPatch,
-        tmp_path: Path) -> None:
+def test_reports_error_on_lint(monkeypatch: pytest.MonkeyPatch,
+                               tmp_path: Path) -> None:
     """Test report generation returns non-zero when linter fails."""
     info = make_build_information(tmp_path)
     report_dir = tmp_path / 'reports'
@@ -397,17 +355,13 @@ def test_reports_error_on_lint(
                         lambda **_kwargs: 'Python')
     result = build_reports._generate_reports(
         report_context=_report_context(
-            build_information=info,
-            report_paths=paths,
-            lint_codes={'mypy': 1, 'flake8': 0, 'python_layout': 0}
-        )
-    )
+            build_information=info, report_paths=paths,
+            lint_codes={'mypy': 1, 'flake8': 0, 'python_layout': 0}))
     assert result == 1
 
 
-def test_reports_error_on_python_layout(
-        monkeypatch: pytest.MonkeyPatch,
-        tmp_path: Path) -> None:
+def test_reports_python_layout_error(monkeypatch: pytest.MonkeyPatch,
+                                     tmp_path: Path) -> None:
     """Test report generation fails when python-layout fails."""
     info = make_build_information(tmp_path)
     report_dir = tmp_path / 'reports'
@@ -422,19 +376,15 @@ def test_reports_error_on_python_layout(
                         lambda **_kwargs: 'Python')
     result = build_reports._generate_reports(
         report_context=_report_context(
-            build_information=info,
-            report_paths=paths,
-            lint_codes={'mypy': 0, 'flake8': 0, 'python_layout': 1}
-        )
-    )
+            build_information=info, report_paths=paths,
+            lint_codes={'mypy': 0, 'flake8': 0, 'python_layout': 1}))
     assert result == 1
     index_text = (report_dir / 'index.html').read_text(encoding='utf-8')
     assert 'python-layout reported warnings or failing guidance.' in index_text
 
 
-def test_reports_sync_warnings(
-        monkeypatch: pytest.MonkeyPatch,
-        tmp_path: Path) -> None:
+def test_reports_sync_warnings(monkeypatch: pytest.MonkeyPatch,
+                               tmp_path: Path) -> None:
     """Test report generation writes repository sync warnings in html."""
     info = make_build_information(tmp_path)
     report_dir = tmp_path / 'reports'
@@ -452,28 +402,22 @@ def test_reports_sync_warnings(
         'unpushed commit(s) to origin/master.'
     )
     result = build_reports._generate_reports(
-        report_context=_report_context(
-            build_information=info,
-            report_paths=paths,
-            repo_sync_warnings=[warning_text]
-        )
-    )
+        report_context=_report_context(build_information=info,
+                                       report_paths=paths,
+                                       repo_sync_warnings=[warning_text]))
     assert result == 0
     index_text = (report_dir / 'index.html').read_text(encoding='utf-8')
     assert 'Repository synchronization warnings' in index_text
     assert warning_text in index_text
 
 
-def test_reports_skip_limit(
-        monkeypatch: pytest.MonkeyPatch,
-        tmp_path: Path) -> None:
+def test_reports_skip_limit(monkeypatch: pytest.MonkeyPatch,
+                            tmp_path: Path) -> None:
     """Test README summary update is skipped when skipped count is too high."""
     package_folder = tmp_path / 'pkg-one'
     package_folder.mkdir(parents=True, exist_ok=True)
-    package = make_package_information(
-        package_folder=package_folder,
-        name='pkg-one'
-    )
+    package = make_package_information(package_folder=package_folder,
+                                       name='pkg-one')
     package_readme = package['package_folder'] / 'README_pypi.md'
     package_readme.write_text('# package\n', encoding='utf-8')
     root_readme = tmp_path / 'README.md'
@@ -484,35 +428,27 @@ def test_reports_skip_limit(
     dist_dir = tmp_path / 'dist'
     dist_dir.mkdir()
     paths = _report_paths(report_dir, dist_dir)
-    paths['pytest_log'].write_text(
-        '=== 5 passed, 4 skipped in 2.11s ===\n',
-        encoding='utf-8'
-    )
+    paths['pytest_log'].write_text('=== 5 passed, 4 skipped in 2.11s ===\n',
+                                   encoding='utf-8')
     _write_clean_lint_reports(paths)
     monkeypatch.setattr(build_reports, '_get_python_version',
                         lambda **_kwargs: 'Python')
     result = build_reports._generate_reports(
-        report_context=_report_context(
-            build_information=info,
-            report_paths=paths,
-            readme_summary_max_skipped=3
-        )
-    )
+        report_context=_report_context(build_information=info,
+                                       report_paths=paths,
+                                       readme_summary_max_skipped=3))
     assert result == 0
     assert '## Test summary' not in root_readme.read_text(encoding='utf-8')
     assert '## Test summary' not in package_readme.read_text(encoding='utf-8')
 
 
 def test_reports_skip_readmes_without_pytest_summary(
-        monkeypatch: pytest.MonkeyPatch,
-        tmp_path: Path) -> None:
+        monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     """Test README summary update is skipped without a pytest summary."""
     package_folder = tmp_path / 'pkg-one'
     package_folder.mkdir(parents=True, exist_ok=True)
-    package = make_package_information(
-        package_folder=package_folder,
-        name='pkg-one'
-    )
+    package = make_package_information(package_folder=package_folder,
+                                       name='pkg-one')
     package_readme = package['package_folder'] / 'README_pypi.md'
     package_readme.write_text('# package\n', encoding='utf-8')
     root_readme = tmp_path / 'README.md'
@@ -527,19 +463,15 @@ def test_reports_skip_readmes_without_pytest_summary(
     monkeypatch.setattr(build_reports, '_get_python_version',
                         lambda **_kwargs: 'Python')
     result = build_reports._generate_reports(
-        report_context=_report_context(
-            build_information=info,
-            report_paths=paths
-        )
-    )
+        report_context=_report_context(build_information=info,
+                                       report_paths=paths))
     assert result == 0
     assert '## Test summary' not in root_readme.read_text(encoding='utf-8')
     assert '## Test summary' not in package_readme.read_text(encoding='utf-8')
 
 
 def test_reports_failure_banner_and_missing_reports(
-        monkeypatch: pytest.MonkeyPatch,
-        tmp_path: Path) -> None:
+        monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     """Test failure summary is visible and missing links explain why."""
     info = make_build_information(tmp_path)
     report_dir = tmp_path / 'reports'
@@ -551,21 +483,15 @@ def test_reports_failure_banner_and_missing_reports(
                         lambda **_kwargs: 'Python')
     result = build_reports._generate_reports(
         report_context=_report_context(
-            build_information=info,
-            report_paths=paths,
+            build_information=info, report_paths=paths,
             lint_codes={
                 'mypy': None,
                 'flake8': None,
                 'python_layout': None
-            },
-            pytest_code=None,
-            pydoc_code=None,
+            }, pytest_code=None, pydoc_code=None,
             build_failure=build_reports.BuildFailure(
                 phase='custom_before_test hooks',
-                detail='RuntimeError: example crashed'
-            )
-        )
-    )
+                detail='RuntimeError: example crashed')))
     assert result == 1
     index_text = (report_dir / 'index.html').read_text(encoding='utf-8')
     assert 'Build failed' in index_text
@@ -573,8 +499,7 @@ def test_reports_failure_banner_and_missing_reports(
     assert 'not generated because build failed earlier' in index_text
 
 
-def test_reports_reject_neg_skip(
-        tmp_path: Path) -> None:
+def test_reports_reject_neg_skip(tmp_path: Path) -> None:
     """Test invalid negative README skipped threshold raises ValueError."""
     info = make_build_information(tmp_path)
     report_dir = tmp_path / 'reports'
@@ -586,17 +511,13 @@ def test_reports_reject_neg_skip(
             ValueError,
             match='readme_summary_max_skipped must be non-negative'):
         _ = build_reports._generate_reports(
-            report_context=_report_context(
-                build_information=info,
-                report_paths=paths,
-                readme_summary_max_skipped=-1
-            )
-        )
+            report_context=_report_context(build_information=info,
+                                           report_paths=paths,
+                                           readme_summary_max_skipped=-1))
 
 
-def test_do_build_runs_steps(
-        monkeypatch: pytest.MonkeyPatch,
-        tmp_path: Path) -> None:
+def test_do_build_runs_steps(monkeypatch: pytest.MonkeyPatch,
+                             tmp_path: Path) -> None:
     """Test do_build orchestrates hooks and core steps in expected order."""
     # pylint: disable=too-many-locals
     events: list[str] = []
@@ -608,19 +529,15 @@ def test_do_build_runs_steps(
 
     package_folder = tmp_path / 'pkg-one'
     package_folder.mkdir(parents=True, exist_ok=True)
-    package = make_package_information(
-        package_folder=package_folder,
-        name='pkg-one'
-    )
+    package = make_package_information(package_folder=package_folder,
+                                       name='pkg-one')
     info = make_build_information(tmp_path, [package])
-    spec = BuildSpec(
-        custom_before_clean=[_hook('before_clean')],
-        custom_before_build=[_hook('before_build')],
-        custom_before_install=[_hook('before_install')],
-        custom_before_test=[_hook('before_test')],
-        custom_after_test=[_hook('after_test')],
-        custom_final=[_hook('final')],
-    )
+    spec = BuildSpec(custom_before_clean=[_hook('before_clean')],
+                     custom_before_build=[_hook('before_build')],
+                     custom_before_install=[_hook('before_install')],
+                     custom_before_test=[_hook('before_test')],
+                     custom_after_test=[_hook('after_test')],
+                     custom_final=[_hook('final')],)
 
     def _prepare(project_root: Path,
                  build_information: BuildInformation) -> dict[str, Path]:
@@ -668,16 +585,11 @@ def test_do_build_runs_steps(
     monkeypatch.setattr(do_build, '_install_packages', _install_packages)
     monkeypatch.setattr(do_build, '_run_linters', _run_linters)
     monkeypatch.setattr(do_build, '_run_pytest', _run_pytest)
-    monkeypatch.setattr(do_build, '_run_pydoc_markdown',
-                        _run_pydoc_markdown)
-    monkeypatch.setattr(do_build, '_restore_line_end_only_changes',
-                        lambda: [])
+    monkeypatch.setattr(do_build, '_run_pydoc_markdown', _run_pydoc_markdown)
+    monkeypatch.setattr(do_build, '_restore_line_end_only_changes', lambda: [])
     monkeypatch.setattr(do_build, '_generate_reports', _generate_reports)
-    result = do_build.do_build(
-        python_name='python3.12',
-        build_spec=spec,
-        build_information=info
-    )
+    result = do_build.do_build(python_name='python3.12', build_spec=spec,
+                               build_information=info)
     assert result == 0
     assert events == [
         'ensure_venv',
@@ -725,8 +637,7 @@ def test_do_build_prints_sync_warns(
     monkeypatch.setattr(do_build, '_build_packages', lambda **_kwargs: 2)
     monkeypatch.setattr(do_build, '_generate_reports',
                         lambda **_kwargs: pytest.fail('unexpected reports'))
-    result = do_build.do_build(build_spec=BuildSpec(),
-                               build_information=info)
+    result = do_build.do_build(build_spec=BuildSpec(), build_information=info)
     assert result == 2
     out, err = capsys.readouterr()
     assert out == ''
@@ -734,9 +645,8 @@ def test_do_build_prints_sync_warns(
     assert err.count(warning_text) == 2
 
 
-def test_do_build_pydoc_error(
-        monkeypatch: pytest.MonkeyPatch,
-        tmp_path: Path) -> None:
+def test_do_build_pydoc_error(monkeypatch: pytest.MonkeyPatch,
+                              tmp_path: Path) -> None:
     """Test do_build returns pydoc error code after report generation."""
     info = make_build_information(tmp_path)
     report_contexts: list[build_reports.ReportGenerationContext] = []
@@ -763,10 +673,8 @@ def test_do_build_pydoc_error(
         'python_layout': 0,
     })
     monkeypatch.setattr(do_build, '_run_pytest', lambda **_kwargs: 0)
-    monkeypatch.setattr(do_build, '_run_pydoc_markdown',
-                        lambda **_kwargs: 2)
-    monkeypatch.setattr(do_build, '_restore_line_end_only_changes',
-                        lambda: [])
+    monkeypatch.setattr(do_build, '_run_pydoc_markdown', lambda **_kwargs: 2)
+    monkeypatch.setattr(do_build, '_restore_line_end_only_changes', lambda: [])
 
     def _capture_report(**kwargs: object) -> int:
         report_context = kwargs['report_context']
@@ -784,8 +692,7 @@ def test_do_build_pydoc_error(
 
 
 def test_do_build_writes_reports_on_post_install_exception(
-        monkeypatch: pytest.MonkeyPatch,
-        tmp_path: Path) -> None:
+        monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     """Test post-install exceptions still produce reports/index.html."""
     info = make_build_information(tmp_path)
 
@@ -802,20 +709,14 @@ def test_do_build_writes_reports_on_post_install_exception(
     def _run_linters(**kwargs: object) -> dict[str, int]:
         report_paths = kwargs['report_paths']
         assert isinstance(report_paths, dict)
-        report_paths['mypy_log'].write_text(
-            'Success: no issues found\n',
-            encoding='utf-8'
-        )
+        report_paths['mypy_log'].write_text('Success: no issues found\n',
+                                            encoding='utf-8')
         (report_paths['flake_dir'] / 'index.html').write_text(
-            'No flake8 errors found',
-            encoding='utf-8'
-        )
+            'No flake8 errors found', encoding='utf-8')
         report_paths['python_layout_log'].write_text(
             'No python layout issues found.\n'
             '\n'
-            'No python-layout guidance messages.\n',
-            encoding='utf-8'
-        )
+            'No python-layout guidance messages.\n', encoding='utf-8')
         return {'mypy': 0, 'flake8': 0, 'python_layout': 0}
 
     def _run_pytest(**kwargs: object) -> int:
@@ -823,23 +724,17 @@ def test_do_build_writes_reports_on_post_install_exception(
         report_dir = kwargs['report_dir']
         assert isinstance(pytest_log, Path)
         assert isinstance(report_dir, Path)
-        pytest_log.write_text('=== 3 passed in 0.10s ===\n',
-                              encoding='utf-8')
+        pytest_log.write_text('=== 3 passed in 0.10s ===\n', encoding='utf-8')
         (report_dir / 'pytest_report.html').write_text('pytest report',
                                                        encoding='utf-8')
         (report_dir / 'coverage').mkdir(exist_ok=True)
-        (report_dir / 'coverage' / 'index.html').write_text(
-            'coverage report',
-            encoding='utf-8'
-        )
+        (report_dir / 'coverage' / 'index.html').write_text('coverage report',
+                                                            encoding='utf-8')
         (report_dir / build_reports.PYLINT_LOG_NAME).write_text(
-            'pylint report\n',
-            encoding='utf-8'
-        )
+            'pylint report\n', encoding='utf-8')
         return 0
 
-    def _raise_after_test(_spec: BuildSpec,
-                          _info: BuildInformation) -> None:
+    def _raise_after_test(_spec: BuildSpec, _info: BuildInformation) -> None:
         raise RuntimeError('example crashed')
 
     monkeypatch.setattr(do_build, 'resolve_target_python',
@@ -855,19 +750,16 @@ def test_do_build_writes_reports_on_post_install_exception(
     with pytest.raises(RuntimeError, match='example crashed'):
         _ = do_build.do_build(
             build_spec=BuildSpec(custom_after_test=[_raise_after_test]),
-            build_information=info
-        )
+            build_information=info)
     index_text = (tmp_path / 'reports' / 'index.html').read_text(
-        encoding='utf-8'
-    )
+        encoding='utf-8')
     assert 'Build failed' in index_text
     assert 'custom_after_test hooks' in index_text
     assert 'example crashed' in index_text
 
 
-def test_do_build_logs_traceback(
-        monkeypatch: pytest.MonkeyPatch,
-        tmp_path: Path) -> None:
+def test_do_build_logs_traceback(monkeypatch: pytest.MonkeyPatch,
+                                 tmp_path: Path) -> None:
     """Test unexpected exception traceback is appended to build log."""
     info = make_build_information(tmp_path)
 

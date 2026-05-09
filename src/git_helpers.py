@@ -16,8 +16,7 @@ try:
     from git.exc import InvalidGitRepositoryError
 except ImportError:
     print('You need to install the gitpython package.', file=sys.stderr)
-    print('\n\tpython3 -m pip install --upgrade gitpython\n',
-          file=sys.stderr)
+    print('\n\tpython3 -m pip install --upgrade gitpython\n', file=sys.stderr)
     sys.exit(1)
 from end_of_line import dos2unix
 from eol_patterns import EOL_ALLOWED_PATTERNS
@@ -32,14 +31,9 @@ def _run_git_subprocess(repo_path: Path, args: list[str],
     """Run git command in one repository with prompt disabled."""
     environment = dict(os.environ)
     environment['GIT_TERMINAL_PROMPT'] = '0'
-    return subprocess.run(
-        ['git', '-C', str(repo_path), *args],
-        capture_output=True,
-        text=True,
-        check=False,
-        timeout=timeout_seconds,
-        env=environment
-    )
+    return subprocess.run(['git', '-C', str(repo_path), *args],
+                          capture_output=True, text=True, check=False,
+                          timeout=timeout_seconds, env=environment)
 
 
 def _git_error_text(process: subprocess.CompletedProcess[str]) -> str:
@@ -66,11 +60,8 @@ def _git_stdout_or_warning(repo_label: str, repo_path: Path, args: list[str],
                                tuple[Optional[str], Optional[str]]:
     """Return git stdout or a formatted warning text for one command."""
     try:
-        process = _run_git_subprocess(
-            repo_path=repo_path,
-            args=args,
-            timeout_seconds=timeout_seconds
-        )
+        process = _run_git_subprocess(repo_path=repo_path, args=args,
+                                      timeout_seconds=timeout_seconds)
     except subprocess.TimeoutExpired:
         return None, (
             f'{repo_label}: {action_text} timed out after '
@@ -84,16 +75,14 @@ def _git_stdout_or_warning(repo_label: str, repo_path: Path, args: list[str],
 
 
 def _upstream_name_or_warning(repo_label: str, repo_path: Path,
-                              branch_name: str,
-                              timeout_seconds: float) -> \
+                              branch_name: str, timeout_seconds: float) -> \
                                   tuple[Optional[str], Optional[str]]:
     """Return upstream branch name or a warning when it cannot be resolved."""
     try:
         process = _run_git_subprocess(
             repo_path=repo_path,
             args=['rev-parse', '--abbrev-ref', '--symbolic-full-name', '@{u}'],
-            timeout_seconds=timeout_seconds
-        )
+            timeout_seconds=timeout_seconds)
     except subprocess.TimeoutExpired:
         return None, (
             f'{repo_label}: upstream check timed out after '
@@ -110,11 +99,9 @@ def _fetch_warning(repo_label: str, repo_path: Path,
                    timeout_seconds: float) -> tuple[bool, Optional[str]]:
     """Fetch remote refs and return success flag plus optional warning."""
     try:
-        process = _run_git_subprocess(
-            repo_path=repo_path,
-            args=['fetch', '--quiet'],
-            timeout_seconds=timeout_seconds
-        )
+        process = _run_git_subprocess(repo_path=repo_path,
+                                      args=['fetch', '--quiet'],
+                                      timeout_seconds=timeout_seconds)
     except subprocess.TimeoutExpired:
         return False, (
             f'{repo_label}: remote check timed out after '
@@ -128,8 +115,7 @@ def _fetch_warning(repo_label: str, repo_path: Path,
 
 
 def _compare_counts_or_warning(repo_label: str, repo_path: Path,
-                               upstream_name: str,
-                               timeout_seconds: float) -> \
+                               upstream_name: str, timeout_seconds: float) -> \
                                    tuple[Optional[tuple[int, int]],
                                          Optional[str]]:
     """Return behind/ahead counts or warning text for branch comparison."""
@@ -137,9 +123,7 @@ def _compare_counts_or_warning(repo_label: str, repo_path: Path,
         process = _run_git_subprocess(
             repo_path=repo_path,
             args=['rev-list', '--left-right', '--count',
-                  f'{upstream_name}...HEAD'],
-            timeout_seconds=timeout_seconds
-        )
+                  f'{upstream_name}...HEAD'], timeout_seconds=timeout_seconds)
     except subprocess.TimeoutExpired:
         return None, (
             f'{repo_label}: branch compare timed out after '
@@ -157,56 +141,43 @@ def _compare_counts_or_warning(repo_label: str, repo_path: Path,
     return counts, None
 
 
-def _branch_upstream_or_warn(
-        repo_label: str, repo_path: Path, timeout_seconds: float) -> \
+def _branch_upstream_or_warn(repo_label: str, repo_path: Path,
+                             timeout_seconds: float) -> \
             tuple[Optional[tuple[str, str]], list[str]]:
     """Resolve branch/upstream names, or return warning list."""
     warnings_list: list[str] = []
     resolved_pair: Optional[tuple[str, str]] = None
     probe_text, probe_warning = _git_stdout_or_warning(
-        repo_label=repo_label,
-        repo_path=repo_path,
+        repo_label=repo_label, repo_path=repo_path,
         args=['rev-parse', '--is-inside-work-tree'],
-        timeout_seconds=timeout_seconds,
-        action_text='git check'
-    )
+        timeout_seconds=timeout_seconds, action_text='git check')
     if probe_warning is not None:
         warnings_list.append(probe_warning)
     elif probe_text != 'true':
         warnings_list.append(
-            f'{repo_label}: folder is not a git repository: {repo_path}'
-        )
+            f'{repo_label}: folder is not a git repository: {repo_path}')
     if not warnings_list:
         branch_text, branch_warning = _git_stdout_or_warning(
-            repo_label=repo_label,
-            repo_path=repo_path,
+            repo_label=repo_label, repo_path=repo_path,
             args=['rev-parse', '--abbrev-ref', 'HEAD'],
-            timeout_seconds=timeout_seconds,
-            action_text='branch check'
-        )
+            timeout_seconds=timeout_seconds, action_text='branch check')
         if branch_warning is not None:
             warnings_list.append(branch_warning)
         elif branch_text == 'HEAD':
             warnings_list.append(
-                f'{repo_label}: detached HEAD, cannot check push/pull status.'
-            )
+                f'{repo_label}: detached HEAD, cannot check push/pull status.')
         elif branch_text is None:
             warnings_list.append(
-                f'{repo_label}: branch check produced empty output.'
-            )
+                f'{repo_label}: branch check produced empty output.')
         else:
             upstream_text, upstream_warning = _upstream_name_or_warning(
-                repo_label=repo_label,
-                repo_path=repo_path,
-                branch_name=branch_text,
-                timeout_seconds=timeout_seconds
-            )
+                repo_label=repo_label, repo_path=repo_path,
+                branch_name=branch_text, timeout_seconds=timeout_seconds)
             if upstream_warning is not None:
                 warnings_list.append(upstream_warning)
             elif upstream_text is None:
                 warnings_list.append(
-                    f'{repo_label}: upstream check produced empty output.'
-                )
+                    f'{repo_label}: upstream check produced empty output.')
             else:
                 resolved_pair = (branch_text, upstream_text)
     return resolved_pair, warnings_list
@@ -221,27 +192,20 @@ def _repo_sync_warnings(repo_label: str, repo_path: Path,
         ]
     warnings_list: list[str] = []
     branch_data, branch_warnings = _branch_upstream_or_warn(
-        repo_label=repo_label,
-        repo_path=repo_path,
-        timeout_seconds=timeout_seconds
-    )
+        repo_label=repo_label, repo_path=repo_path,
+        timeout_seconds=timeout_seconds)
     warnings_list.extend(branch_warnings)
     if branch_data is None:
         return warnings_list
     branch_name, upstream_name = branch_data
-    fetch_ok, fetch_warning = _fetch_warning(
-        repo_label=repo_label,
-        repo_path=repo_path,
-        timeout_seconds=timeout_seconds
-    )
+    fetch_ok, fetch_warning = _fetch_warning(repo_label=repo_label,
+                                             repo_path=repo_path,
+                                             timeout_seconds=timeout_seconds)
     if fetch_warning is not None:
         warnings_list.append(fetch_warning)
     counts, compare_warning = _compare_counts_or_warning(
-        repo_label=repo_label,
-        repo_path=repo_path,
-        upstream_name=upstream_name,
-        timeout_seconds=timeout_seconds
-    )
+        repo_label=repo_label, repo_path=repo_path,
+        upstream_name=upstream_name, timeout_seconds=timeout_seconds)
     if compare_warning is not None:
         warnings_list.append(compare_warning)
         return warnings_list
@@ -251,13 +215,11 @@ def _repo_sync_warnings(repo_label: str, repo_path: Path,
     if ahead_count > 0:
         warnings_list.append(
             f'{repo_label}: local branch {branch_name} has '
-            f'{ahead_count} unpushed commit(s) to {upstream_name}.'
-        )
+            f'{ahead_count} unpushed commit(s) to {upstream_name}.')
     if fetch_ok and behind_count > 0:
         warnings_list.append(
             f'{repo_label}: remote branch {upstream_name} has '
-            f'{behind_count} newer commit(s) to pull.'
-        )
+            f'{behind_count} newer commit(s) to pull.')
     return warnings_list
 
 
@@ -273,12 +235,8 @@ def get_repo_sync_warnings(
     ]
     for repo_label, repo_path in repo_checks:
         warnings_list.extend(
-            _repo_sync_warnings(
-                repo_label=repo_label,
-                repo_path=repo_path,
-                timeout_seconds=timeout_seconds
-            )
-        )
+            _repo_sync_warnings(repo_label=repo_label, repo_path=repo_path,
+                                timeout_seconds=timeout_seconds))
     return warnings_list
 
 
@@ -299,9 +257,9 @@ def get_git_root(pathlocation: Optional[Path] = None,
     Returns:
         The path to the root of the git repo.
     """
-    usepath: Path = pathlocation if pathlocation is not None else Path(
-        __file__
-    ).parent
+    usepath: Path = (
+        pathlocation if pathlocation is not None else Path(__file__).parent
+    )
     try:
         repo: Repo = Repo(usepath, search_parent_directories=True)
     except InvalidGitRepositoryError as exc:
@@ -374,8 +332,7 @@ def _get_unstaged_repo_paths(repo: Repo,
         unstaged_paths.append(Path(diff.a_path))
     if not only_changed:
         unstaged_paths.extend(
-            Path(path_text) for path_text in repo.untracked_files
-        )
+            Path(path_text) for path_text in repo.untracked_files)
     unique_paths: list[Path] = []
     seen_paths: set[Path] = set()
     for file_path in unstaged_paths:
@@ -419,8 +376,7 @@ def get_unstaged_files_wr(only_changed: bool = True,
                 (submodule_repo, file_path) for file_path in
                 _get_unstaged_repo_paths(submodule_repo,
                                          only_changed=only_changed)
-            ]
-        )
+            ])
     return unstaged_files
 
 
@@ -443,10 +399,8 @@ def get_unstaged_files(only_changed: bool = True,
         Deleted files are not included.
     """
     main_repo = _get_main_repo()
-    unstaged_files = get_unstaged_files_wr(
-        only_changed=only_changed,
-        all_submodules=all_submodules
-    )
+    unstaged_files = get_unstaged_files_wr(only_changed=only_changed,
+                                           all_submodules=all_submodules)
     return [
         _to_main_relative_path(main_repo, repo, file_path)
         for repo, file_path in unstaged_files
@@ -474,13 +428,11 @@ def get_only_line_end_changes(all_submodules: bool = True) -> list[Path]:
                                     file_path.as_posix())
         if not diff_output.strip():
             only_eol_changes.append(
-                _to_main_relative_path(main_repo, repo, file_path)
-            )
+                _to_main_relative_path(main_repo, repo, file_path))
     return only_eol_changes
 
 
-def _matches_allowed_patterns(path: Path,
-                              allowed_patterns: list[str]) -> bool:
+def _matches_allowed_patterns(path: Path, allowed_patterns: list[str]) -> bool:
     """Check if a path matches at least one allowed regex pattern."""
     path_text = path.as_posix()
     return any(re.match(pattern, path_text) for pattern in allowed_patterns)
@@ -506,8 +458,8 @@ def _candidate_files_for_restore(main_repo: Repo, all_submodules: bool,
         for repo in repos:
             repo_files = _tracked_files_for_repo(repo)
             for repo_path in repo_files:
-                main_rel_path = _to_main_relative_path(
-                    main_repo, repo, repo_path)
+                main_rel_path = _to_main_relative_path(main_repo, repo,
+                                                       repo_path)
                 candidate_files.append((repo, repo_path, main_rel_path))
         return candidate_files
     main_rel_only_eol = get_only_line_end_changes(all_submodules)
@@ -560,10 +512,7 @@ def restore_bad_eol_changes(all_submodules: bool = True,
                     else allowed_patterns)
     main_repo = _get_main_repo()
     candidate_files = _candidate_files_for_restore(
-        main_repo,
-        all_submodules=all_submodules,
-        force_unix=force_unix
-    )
+        main_repo, all_submodules=all_submodules, force_unix=force_unix)
     seen_paths: set[Path] = set()
     restored_files: list[Path] = []
     for repo, repo_rel_path, main_rel_path in candidate_files:

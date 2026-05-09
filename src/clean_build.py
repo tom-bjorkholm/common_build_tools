@@ -28,11 +28,8 @@ def clean_build(python_name: Optional[str] = None,
     exit_if_in_virtualenv('delete virtual environment')
     resolved_name = resolve_target_python(python_name)[0]
     clean(build_spec=active_spec, build_information=active_information)
-    setup_build_environment(
-        python_name=resolved_name,
-        build_spec=active_spec,
-        build_information=active_information
-    )
+    setup_build_environment(python_name=resolved_name, build_spec=active_spec,
+                            build_information=active_information)
     return do_build(python_name=resolved_name, build_spec=active_spec,
                     build_information=active_information)
 

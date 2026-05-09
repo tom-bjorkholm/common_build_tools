@@ -19,13 +19,8 @@ import git_helpers  # noqa: E402
 
 def _run_git(args: list[str], repo_path: Path) -> str:
     """Run a git command in a repository and return stdout."""
-    result = subprocess.run(
-        ['git'] + args,
-        cwd=repo_path,
-        text=True,
-        capture_output=True,
-        check=False
-    )
+    result = subprocess.run(['git'] + args, cwd=repo_path, text=True,
+                            capture_output=True, check=False)
     if result.returncode != 0:
         cmd_text = ' '.join(['git'] + args)
         raise RuntimeError(f'Git command failed: {cmd_text}\n{result.stderr}')
@@ -66,11 +61,7 @@ def _clone_repo(remote_path: Path, clone_path: Path) -> None:
     clone_path.parent.mkdir(parents=True, exist_ok=True)
     result = subprocess.run(
         ['git', 'clone', str(remote_path), str(clone_path)],
-        cwd=clone_path.parent,
-        text=True,
-        capture_output=True,
-        check=False
-    )
+        cwd=clone_path.parent, text=True, capture_output=True, check=False)
     if result.returncode != 0:
         raise RuntimeError(f'Git clone failed: {result.stderr}')
     _run_git(['config', 'user.name', 'Test User'], clone_path)
@@ -98,9 +89,7 @@ def _create_repo_with_submodule(
             'add',
             str(submodule_source),
             'submod'
-        ],
-        main_repo
-    )
+        ], main_repo)
     _commit_all(main_repo, 'initial main commit')
     submodule_file = main_repo / 'submod' / 'sub.py'
     main_file.write_bytes(b'print(1)\r\n')
@@ -126,14 +115,16 @@ def test_git_root_submodule_main() -> None:
         base_path = Path(tmp_dir)
         main_repo, _, _, _ = _create_repo_with_submodule(base_path)
         submodule_path = main_repo / 'submod' / 'sub.py'
-        assert git_helpers.get_git_root(
-            pathlocation=submodule_path,
-            this_submodule=True
-        ).resolve() == (main_repo / 'submod').resolve()
-        assert git_helpers.get_git_root(
-            pathlocation=submodule_path,
-            this_submodule=False
-        ).resolve() == main_repo.resolve()
+        assert (
+            git_helpers.get_git_root(pathlocation=submodule_path,
+                                     this_submodule=True).resolve() ==
+            (main_repo / 'submod').resolve()
+        )
+        assert (
+            git_helpers.get_git_root(pathlocation=submodule_path,
+                                     this_submodule=False).resolve() ==
+            main_repo.resolve()
+        )
 
 
 def test_git_root_warns_no_parent() -> None:
@@ -152,34 +143,25 @@ def test_unstaged_files_main_rel(monkeypatch: pytest.MonkeyPatch) -> \
     with TemporaryDirectory() as tmp_dir:
         base_path = Path(tmp_dir)
         main_repo, _, _, _ = _create_repo_with_submodule(base_path)
-        monkeypatch.setattr(
-            git_helpers,
-            'get_git_root',
-            lambda *_, **__: main_repo
-        )
+        monkeypatch.setattr(git_helpers, 'get_git_root', lambda *_,
+                            **__: main_repo)
         unstaged = git_helpers.get_unstaged_files(all_submodules=True)
         assert Path('main.py') in unstaged
         assert Path('changed.txt') in unstaged
         assert Path('submod/sub.py') in unstaged
         assert Path('new.txt') not in unstaged
-        unstaged_all = git_helpers.get_unstaged_files(
-            only_changed=False,
-            all_submodules=False
-        )
+        unstaged_all = git_helpers.get_unstaged_files(only_changed=False,
+                                                      all_submodules=False)
         assert Path('new.txt') in unstaged_all
 
 
-def test_unstaged_files_wr_rel(
-        monkeypatch: pytest.MonkeyPatch) -> None:
+def test_unstaged_files_wr_rel(monkeypatch: pytest.MonkeyPatch) -> None:
     """Test wrapped unstaged files are returned as repo-relative paths."""
     with TemporaryDirectory() as tmp_dir:
         base_path = Path(tmp_dir)
         main_repo, _, _, _ = _create_repo_with_submodule(base_path)
-        monkeypatch.setattr(
-            git_helpers,
-            'get_git_root',
-            lambda *_, **__: main_repo
-        )
+        monkeypatch.setattr(git_helpers, 'get_git_root', lambda *_,
+                            **__: main_repo)
         unstaged_wr = git_helpers.get_unstaged_files_wr(all_submodules=True)
         repo_paths: dict[Path, set[Path]] = {}
         for repo, file_path in unstaged_wr:
@@ -196,29 +178,22 @@ def test_only_eol_changes(monkeypatch: pytest.MonkeyPatch) -> None:
     with TemporaryDirectory() as tmp_dir:
         base_path = Path(tmp_dir)
         main_repo, _, _, _ = _create_repo_with_submodule(base_path)
-        monkeypatch.setattr(
-            git_helpers,
-            'get_git_root',
-            lambda *_, **__: main_repo
-        )
+        monkeypatch.setattr(git_helpers, 'get_git_root', lambda *_,
+                            **__: main_repo)
         only_eol = git_helpers.get_only_line_end_changes(all_submodules=True)
         assert Path('main.py') in only_eol
         assert Path('submod/sub.py') in only_eol
         assert Path('changed.txt') not in only_eol
 
 
-def test_restore_eol_only(
-        monkeypatch: pytest.MonkeyPatch) -> None:
+def test_restore_eol_only(monkeypatch: pytest.MonkeyPatch) -> None:
     """Test restore_bad_eol_changes restores only line-ending changes."""
     with TemporaryDirectory() as tmp_dir:
         base_path = Path(tmp_dir)
         main_repo, main_file, submodule_file, changed_file = \
             _create_repo_with_submodule(base_path)
-        monkeypatch.setattr(
-            git_helpers,
-            'get_git_root',
-            lambda *_, **__: main_repo
-        )
+        monkeypatch.setattr(git_helpers, 'get_git_root', lambda *_,
+                            **__: main_repo)
         restored = git_helpers.restore_bad_eol_changes(all_submodules=True)
         assert Path('main.py') in restored
         assert Path('submod/sub.py') in restored
@@ -228,44 +203,31 @@ def test_restore_eol_only(
         assert changed_file.read_bytes() == b'changed-content\n'
 
 
-def test_restore_force_unix(
-        monkeypatch: pytest.MonkeyPatch) -> None:
+def test_restore_force_unix(monkeypatch: pytest.MonkeyPatch) -> None:
     """Test force_unix converts tracked files even without unstaged changes."""
     with TemporaryDirectory() as tmp_dir:
         base_path = Path(tmp_dir)
         repo_path = _create_simple_repo(base_path, 'dos.txt', b'a\r\nb\r\n')
-        monkeypatch.setattr(
-            git_helpers,
-            'get_git_root',
-            lambda *_, **__: repo_path
-        )
+        monkeypatch.setattr(git_helpers, 'get_git_root', lambda *_,
+                            **__: repo_path)
         restored = git_helpers.restore_bad_eol_changes(
-            all_submodules=False,
-            force_unix=True,
-            allowed_patterns=[r'.*\.txt$']
-        )
+            all_submodules=False, force_unix=True,
+            allowed_patterns=[r'.*\.txt$'])
         assert restored == [Path('dos.txt')]
         assert (repo_path / 'dos.txt').read_bytes() == b'a\nb\n'
 
 
-def test_restore_not_allowed_msg(
-        monkeypatch: pytest.MonkeyPatch,
-        capsys: pytest.CaptureFixture[str]) -> None:
+def test_restore_not_allowed_msg(monkeypatch: pytest.MonkeyPatch,
+                                 capsys: pytest.CaptureFixture[str]) -> None:
     """Test verbose force_unix reports files blocked by allowed patterns."""
     with TemporaryDirectory() as tmp_dir:
         base_path = Path(tmp_dir)
         repo_path = _create_simple_repo(base_path, 'skip.bin', b'a\r\n')
-        monkeypatch.setattr(
-            git_helpers,
-            'get_git_root',
-            lambda *_, **__: repo_path
-        )
+        monkeypatch.setattr(git_helpers, 'get_git_root', lambda *_,
+                            **__: repo_path)
         restored = git_helpers.restore_bad_eol_changes(
-            all_submodules=False,
-            force_unix=True,
-            allowed_patterns=[r'.*\.txt$'],
-            verbose=True
-        )
+            all_submodules=False, force_unix=True,
+            allowed_patterns=[r'.*\.txt$'], verbose=True)
         assert not restored
         out, err = capsys.readouterr()
         assert out == ''
@@ -286,13 +248,10 @@ def test_sync_warns_unpushed() -> None:
         tracked_file.write_text('line two\n', encoding='utf-8')
         _commit_all(repo_path, 'local commit')
         warnings_list = git_helpers.get_repo_sync_warnings(
-            project_root=repo_path,
-            timeout_seconds=5.0
-        )
+            project_root=repo_path, timeout_seconds=5.0)
         assert any(
             'unpushed commit(s)' in warning_text
-            for warning_text in warnings_list
-        )
+            for warning_text in warnings_list)
 
 
 def test_sync_warns_remote_newer() -> None:
@@ -313,13 +272,10 @@ def test_sync_warns_remote_newer() -> None:
         _commit_all(updater_path, 'remote commit')
         _run_git(['push'], updater_path)
         warnings_list = git_helpers.get_repo_sync_warnings(
-            project_root=repo_path,
-            timeout_seconds=5.0
-        )
+            project_root=repo_path, timeout_seconds=5.0)
         assert any(
             'newer commit(s) to pull.' in warning_text
-            for warning_text in warnings_list
-        )
+            for warning_text in warnings_list)
 
 
 def test_sync_warns_both_repos() -> None:
@@ -341,21 +297,15 @@ def test_sync_warns_both_repos() -> None:
         submodule_file.write_text('tool\n', encoding='utf-8')
         _commit_all(submodule_root, 'initial submodule commit')
         submodule_origin = _init_bare_repo(base_path, 'cbt_origin.git')
-        _set_origin_and_push(
-            repo_path=submodule_root,
-            origin_path=submodule_origin
-        )
+        _set_origin_and_push(repo_path=submodule_root,
+                             origin_path=submodule_origin)
         submodule_file.write_text('tool changed\n', encoding='utf-8')
         _commit_all(submodule_root, 'submodule local commit')
         warnings_list = git_helpers.get_repo_sync_warnings(
-            project_root=project_root,
-            timeout_seconds=5.0
-        )
+            project_root=project_root, timeout_seconds=5.0)
         assert any(
             warning_text.startswith('Main repository:')
-            for warning_text in warnings_list
-        )
+            for warning_text in warnings_list)
         assert any(
             warning_text.startswith('common_build_tools repository:')
-            for warning_text in warnings_list
-        )
+            for warning_text in warnings_list)

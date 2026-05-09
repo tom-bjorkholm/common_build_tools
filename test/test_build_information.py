@@ -23,21 +23,16 @@ def _package_data(name: str, version: str,
                   dependencies: list[str]) -> PackageInformation:
     """Create minimal PackageInformation test object."""
     return make_package_information(
-        package_folder=Path('/tmp') / name,
-        name=name,
-        version=version,
+        package_folder=Path('/tmp') / name, name=name, version=version,
         dependencies=dependencies,
-        normalized_name=name.strip().lower().replace('-', '_'),
-    )
+        normalized_name=name.strip().lower().replace('-', '_'),)
 
 
 def test_discover_pkgs_skips_venv(tmp_path: Path) -> None:
     """Test auto-discovery ignores excluded folders like venv."""
     _write_text(tmp_path / 'pkg' / 'setup.py', 'from setuptools import setup')
-    _write_text(
-        tmp_path / 'venv' / 'hidden_pkg' / 'setup.py',
-        'from setuptools import setup'
-    )
+    _write_text(tmp_path / 'venv' / 'hidden_pkg' / 'setup.py',
+                'from setuptools import setup')
     discovered = build_information._discover_package_folders(tmp_path)
     assert discovered == [(tmp_path / 'pkg').resolve()]
 
@@ -45,16 +40,14 @@ def test_discover_pkgs_skips_venv(tmp_path: Path) -> None:
 def test_parse_setup_reads_literals(tmp_path: Path) -> None:
     """Test setup.py parser resolves literal-assigned metadata values."""
     setup_path = tmp_path / 'setup.py'
-    _write_text(
-        setup_path,
-        'from setuptools import setup\n'
-        "NAME = 'pkg-name'\n"
-        "VERSION = '1.2.3'\n"
-        "DESC = 'Package description'\n"
-        "REQUIRES = ['dep >= 1.0', 'dep-two==2.0']\n"
-        "setup(name=NAME, version=VERSION, description=DESC,\n"
-        "      python_requires='>=3.12', install_requires=REQUIRES)\n"
-    )
+    _write_text(setup_path,
+                'from setuptools import setup\n'
+                "NAME = 'pkg-name'\n"
+                "VERSION = '1.2.3'\n"
+                "DESC = 'Package description'\n"
+                "REQUIRES = ['dep >= 1.0', 'dep-two==2.0']\n"
+                "setup(name=NAME, version=VERSION, description=DESC,\n"
+                "      python_requires='>=3.12', install_requires=REQUIRES)\n")
     parsed = build_information._parse_setup_file(setup_path)
     assert parsed['name'] == 'pkg-name'
     assert parsed['version'] == '1.2.3'
@@ -74,13 +67,11 @@ def test_parse_setup_needs_call(tmp_path: Path) -> None:
 def test_parse_pyproject_dyn_deps(tmp_path: Path) -> None:
     """Test pyproject parser returns None for dynamic dependencies."""
     pyproject_path = tmp_path / 'pyproject.toml'
-    _write_text(
-        pyproject_path,
-        '[project]\n'
-        "name = 'pkg-dynamic'\n"
-        "version = '2.0.0'\n"
-        "dynamic = ['dependencies']\n"
-    )
+    _write_text(pyproject_path,
+                '[project]\n'
+                "name = 'pkg-dynamic'\n"
+                "version = '2.0.0'\n"
+                "dynamic = ['dependencies']\n")
     parsed = build_information._parse_pyproject_file(pyproject_path)
     assert parsed['name'] == 'pkg-dynamic'
     assert parsed['version'] == '2.0.0'
@@ -105,10 +96,8 @@ def test_setup_pyproject_mismatch() -> None:
     }
     with pytest.raises(ValueError, match='Inconsistent version'):
         build_information._check_setup_pyproject_match(
-            package_folder=Path('/tmp/pkg'),
-            setup_data=setup_data,
-            pyproject_data=pyproject_data
-        )
+            package_folder=Path('/tmp/pkg'), setup_data=setup_data,
+            pyproject_data=pyproject_data)
 
 
 def test_combine_pkg_data_dirs(tmp_path: Path) -> None:
@@ -118,24 +107,18 @@ def test_combine_pkg_data_dirs(tmp_path: Path) -> None:
     (package_folder / 'test').mkdir(parents=True)
     setup_path = package_folder / 'setup.py'
     pyproject_path = package_folder / 'pyproject.toml'
-    _write_text(
-        setup_path,
-        'from setuptools import setup\n'
-        "setup(name='pkg-one', version='1.0.0',\n"
-        "      install_requires=['dep>=2.0'])\n"
-    )
-    _write_text(
-        pyproject_path,
-        '[project]\n'
-        "name = 'pkg-one'\n"
-        "version = '1.0.0'\n"
-        "dependencies = ['dep>=2.0']\n"
-    )
+    _write_text(setup_path,
+                'from setuptools import setup\n'
+                "setup(name='pkg-one', version='1.0.0',\n"
+                "      install_requires=['dep>=2.0'])\n")
+    _write_text(pyproject_path,
+                '[project]\n'
+                "name = 'pkg-one'\n"
+                "version = '1.0.0'\n"
+                "dependencies = ['dep>=2.0']\n")
     combined = build_information._combine_package_data(
-        package_folder=package_folder,
-        setup_file=setup_path,
-        pyproject_file=pyproject_path
-    )
+        package_folder=package_folder, setup_file=setup_path,
+        pyproject_file=pyproject_path)
     assert combined['name'] == 'pkg-one'
     assert combined['normalized_name'] == 'pkg_one'
     assert combined['src_folder'] == (package_folder / 'src')
@@ -185,36 +168,28 @@ def test_discover_build_info_repo(tmp_path: Path) -> None:
     """Test discover_build_information on a temporary multi-package repo."""
     package_base = tmp_path / 'pkg_base'
     package_app = tmp_path / 'pkg_app'
-    _write_text(
-        package_base / 'pyproject.toml',
-        '[project]\n'
-        "name = 'pkg-base'\n"
-        "version = '1.0.0'\n"
-        'dependencies = []\n'
-    )
-    _write_text(
-        package_app / 'setup.py',
-        'from setuptools import setup\n'
-        "setup(name='pkg-app', version='1.0.0',\n"
-        "      install_requires=['pkg-base>=1.0.0'])\n"
-    )
+    _write_text(package_base / 'pyproject.toml',
+                '[project]\n'
+                "name = 'pkg-base'\n"
+                "version = '1.0.0'\n"
+                'dependencies = []\n')
+    _write_text(package_app / 'setup.py',
+                'from setuptools import setup\n'
+                "setup(name='pkg-app', version='1.0.0',\n"
+                "      install_requires=['pkg-base>=1.0.0'])\n")
     (package_base / 'src').mkdir(parents=True)
     (package_base / 'test').mkdir(parents=True)
     (package_app / 'src').mkdir(parents=True)
     (package_app / 'test').mkdir(parents=True)
     (tmp_path / 'custom_build_tools').mkdir()
     (tmp_path / 'extra').mkdir()
-    build_spec = BuildSpec(
-        package_folders=[Path('pkg_base'), Path('pkg_app')],
-        mypy_on_test=False,
-        flake8_additional_folders=[Path('extra')],
-        flake8_exclude_folders=[Path('pkg_app/test')],
-        mypy_paths=[Path('extra')]
-    )
+    build_spec = BuildSpec(package_folders=[Path('pkg_base'), Path('pkg_app')],
+                           mypy_on_test=False,
+                           flake8_additional_folders=[Path('extra')],
+                           flake8_exclude_folders=[Path('pkg_app/test')],
+                           mypy_paths=[Path('extra')])
     discovered = build_information.discover_build_information(
-        build_spec=build_spec,
-        project_root=tmp_path
-    )
+        build_spec=build_spec, project_root=tmp_path)
     assert discovered['package_install_order'] == ['pkg-base', 'pkg-app']
     assert discovered['project_root'] == tmp_path.resolve()
     assert (package_base / 'test').resolve() in discovered['pytest_folders']
@@ -226,9 +201,8 @@ def test_discover_build_info_repo(tmp_path: Path) -> None:
         discovered['mypy_path_folders']
 
 
-def test_get_build_info_uses_spec(
-        monkeypatch: pytest.MonkeyPatch,
-        tmp_path: Path) -> None:
+def test_get_build_info_uses_spec(monkeypatch: pytest.MonkeyPatch,
+                                  tmp_path: Path) -> None:
     """Test get_build_information forwards explicit build spec unchanged."""
     expected = {
         'project_root': tmp_path,

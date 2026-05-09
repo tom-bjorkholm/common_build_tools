@@ -65,9 +65,7 @@ def _initial_build_run_status() -> BuildRunStatus:
     """Return build run status before lint, pytest and pydoc have run."""
     return BuildRunStatus(
         lint_codes={'mypy': None, 'flake8': None, 'python_layout': None},
-        pytest_code=None,
-        pydoc_code=None
-    )
+        pytest_code=None, pydoc_code=None)
 
 
 def _ensure_venv(python_name: Optional[str], project_root: Path,
@@ -78,11 +76,8 @@ def _ensure_venv(python_name: Optional[str], project_root: Path,
     venv_path = project_root / venv_cmd[0]
     if venv_path.exists():
         return
-    setup_build_environment(
-        python_name=python_name,
-        build_spec=build_spec,
-        build_information=build_information
-    )
+    setup_build_environment(python_name=python_name, build_spec=build_spec,
+                            build_information=build_information)
 
 
 def _clean_cache_folders(build_information: BuildInformation) -> None:
@@ -154,11 +149,8 @@ def _build_packages(venv_cmd: list[str], build_information: BuildInformation,
         package_folder = package_data['package_folder']
         return_code = run_command_logged(
             [*venv_cmd, '-m', 'build', str(package_folder), '--outdir',
-             DIST_DIR_NAME],
-            log_file=build_log,
-            check=False,
-            cwd=project_root,
-        )
+             DIST_DIR_NAME], log_file=build_log, check=False,
+            cwd=project_root,)
         if return_code != 0:
             return return_code
     return 0
@@ -168,8 +160,7 @@ def _wheel_regex_for_package(package_name: str) -> re.Pattern[str]:
     """Return regex for wheel files of one package."""
     escaped_name = ''.join(
         '[-_]' if char in '-_' else re.escape(char)
-        for char in package_name
-    )
+        for char in package_name)
     return re.compile(rf'^{escaped_name}-.*\.whl$')
 
 
@@ -178,8 +169,7 @@ def _find_wheel(dist_dir: Path, package_name: str) -> Path:
     pattern = _wheel_regex_for_package(package_name)
     wheel_files = sorted(
         wheel for wheel in dist_dir.glob('*.whl')
-        if pattern.match(wheel.name)
-    )
+        if pattern.match(wheel.name))
     if wheel_files:
         return wheel_files[-1]
     raise ValueError(f'Built wheel not found for package {package_name}')
@@ -193,22 +183,15 @@ def _install_packages(venv_cmd: list[str], build_information: BuildInformation,
         package_data['name'].replace('_', '-')
         for package_data in build_information['package_information']
     ]
-    run_command_logged(
-        [*venv_cmd, '-m', 'pip', 'uninstall', '-y', *pip_names],
-        log_file=build_log,
-        check=False,
-        cwd=project_root,
-    )
+    run_command_logged([*venv_cmd, '-m', 'pip', 'uninstall', '-y', *pip_names],
+                       log_file=build_log, check=False, cwd=project_root,)
     package_map = _package_map_by_name(build_information)
     for package_name in build_information['package_install_order']:
         _ = package_map[package_name]
         wheel_file = _find_wheel(dist_dir=dist_dir, package_name=package_name)
         return_code = run_command_logged(
             [*venv_cmd, '-m', 'pip', 'install', str(wheel_file)],
-            log_file=build_log,
-            check=False,
-            cwd=project_root,
-        )
+            log_file=build_log, check=False, cwd=project_root,)
         if return_code != 0:
             return return_code
     return 0
@@ -236,8 +219,7 @@ def _pytest_command(venv_cmd: list[str], build_information: BuildInformation,
     """Construct pytest command for discovered test and pylint folders."""
     command = [*venv_cmd, '-m', 'pytest']
     command.extend(
-        str(path) for path in _pytest_collection_folders(build_information)
-    )
+        str(path) for path in _pytest_collection_folders(build_information))
     command.extend([
         f'--html={report_dir / "pytest_report.html"}',
         '--self-contained-html',
@@ -265,13 +247,9 @@ def _run_pytest(venv_cmd: list[str], build_information: BuildInformation,
         return 0
     pylint_log.touch(exist_ok=True)
     return run_command_logged(
-        _pytest_command(venv_cmd=venv_cmd,
-                        build_information=build_information,
-                        report_dir=report_dir),
-        log_file=pytest_log,
-        check=False,
-        cwd=project_root,
-    )
+        _pytest_command(venv_cmd=venv_cmd, build_information=build_information,
+                        report_dir=report_dir), log_file=pytest_log,
+        check=False, cwd=project_root,)
 
 
 def _run_pydoc_markdown(venv_cmd: list[str], build_spec: BuildSpec,
@@ -287,10 +265,7 @@ def _run_pydoc_markdown(venv_cmd: list[str], build_spec: BuildSpec,
     for config_file in sorted(custom_folder.glob('pydoc-markdown*.yml')):
         return_code = run_command_logged(
             [pydoc_markdown_script, '--render-toc', str(config_file)],
-            log_file=build_log,
-            check=False,
-            cwd=project_root,
-        )
+            log_file=build_log, check=False, cwd=project_root,)
         if return_code != 0:
             return return_code
     return 0
@@ -313,16 +288,12 @@ def _print_repo_sync_warnings(repo_sync_warnings: list[str],
 
 def _restore_line_end_only_changes() -> list[Path]:
     """Restore files changed only by line endings and return restored paths."""
-    return restore_bad_eol_changes(
-        all_submodules=True,
-        force_unix=False,
-        verbose=True
-    )
+    return restore_bad_eol_changes(all_submodules=True, force_unix=False,
+                                   verbose=True)
 
 
 def _append_traceback_to_build_log(
-        project_root: Path,
-        report_paths: Optional[dict[str, Path]]) -> None:
+        project_root: Path, report_paths: Optional[dict[str, Path]]) -> None:
     """Append traceback for unexpected do_build exceptions to build log."""
     log_path: Optional[Path]
     if report_paths is None:
@@ -336,9 +307,7 @@ def _append_traceback_to_build_log(
         file_obj.write('\n')
         file_obj.write(
             datetime.now().astimezone().strftime(
-                'Unhandled exception %Y-%m-%d %H:%M:%S %Z\n'
-            )
-        )
+                'Unhandled exception %Y-%m-%d %H:%M:%S %Z\n'))
         file_obj.write(traceback.format_exc())
 
 
@@ -355,8 +324,7 @@ def _generate_reports_after_failure(
     except Exception:  # pylint: disable=broad-exception-caught
         _append_traceback_to_build_log(
             project_root=report_context.build_information['project_root'],
-            report_paths=report_context.report_paths
-        )
+            report_paths=report_context.report_paths)
 
 
 def do_build(python_name: Optional[str] = None,
@@ -380,50 +348,38 @@ def do_build(python_name: Optional[str] = None,
         current_phase = 'python selection'
         resolve_target_python(python_name)
         current_phase = 'virtual environment setup'
-        _ensure_venv(
-            python_name=python_name,
-            project_root=project_root,
-            build_spec=active_spec,
-            build_information=active_information
-        )
+        _ensure_venv(python_name=python_name, project_root=project_root,
+                     build_spec=active_spec,
+                     build_information=active_information)
         venv_cmd = venv_python()
         current_phase = 'custom_before_clean hooks'
         _run_custom_hooks(active_spec.custom_before_clean, active_spec,
                           active_information)
         current_phase = 'prepare output directories'
         report_paths = _prepare_directories(
-            project_root=project_root,
-            build_information=active_information
-        )
+            project_root=project_root, build_information=active_information)
         report_paths['build_log'].write_text(
             datetime.now().astimezone().strftime(
-                'Build started %Y-%m-%d %H:%M:%S %Z\n'
-            ),
-            encoding='utf-8'
-        )
+                'Build started %Y-%m-%d %H:%M:%S %Z\n'), encoding='utf-8')
         current_phase = 'custom_before_build hooks'
         _run_custom_hooks(active_spec.custom_before_build, active_spec,
                           active_information)
         current_phase = 'build wheel packages'
-        build_code = _build_packages(
-            venv_cmd=venv_cmd,
-            build_information=active_information,
-            build_log=report_paths['build_log'],
-            project_root=project_root
-        )
+        build_code = _build_packages(venv_cmd=venv_cmd,
+                                     build_information=active_information,
+                                     build_log=report_paths['build_log'],
+                                     project_root=project_root)
         if build_code != 0:
             return build_code
         current_phase = 'custom_before_install hooks'
         _run_custom_hooks(active_spec.custom_before_install, active_spec,
                           active_information)
         current_phase = 'install wheel packages'
-        install_code = _install_packages(
-            venv_cmd=venv_cmd,
-            build_information=active_information,
-            build_log=report_paths['build_log'],
-            dist_dir=report_paths['dist_dir'],
-            project_root=project_root
-        )
+        install_code = _install_packages(venv_cmd=venv_cmd,
+                                         build_information=active_information,
+                                         build_log=report_paths['build_log'],
+                                         dist_dir=report_paths['dist_dir'],
+                                         project_root=project_root)
         if install_code != 0:
             return install_code
         reports_enabled = True
@@ -431,46 +387,33 @@ def do_build(python_name: Optional[str] = None,
         _run_custom_hooks(active_spec.custom_before_test, active_spec,
                           active_information)
         current_phase = 'mypy, flake8 and python-layout'
-        lint_codes = _run_linters(
-            venv_cmd=venv_cmd,
-            build_information=active_information,
-            report_paths=report_paths,
-            project_root=project_root,
-            build_spec=active_spec
-        )
-        build_run_status = BuildRunStatus(
-            lint_codes=lint_codes,
-            pytest_code=None,
-            pydoc_code=None
-        )
+        lint_codes = _run_linters(venv_cmd=venv_cmd,
+                                  build_information=active_information,
+                                  report_paths=report_paths,
+                                  project_root=project_root,
+                                  build_spec=active_spec)
+        build_run_status = BuildRunStatus(lint_codes=lint_codes,
+                                          pytest_code=None, pydoc_code=None)
         current_phase = 'pytest'
-        pytest_code = _run_pytest(
-            venv_cmd=venv_cmd,
-            build_information=active_information,
-            pytest_log=report_paths['pytest_log'],
-            report_dir=report_paths['report_dir'],
-            project_root=project_root
-        )
-        build_run_status = BuildRunStatus(
-            lint_codes=lint_codes,
-            pytest_code=pytest_code,
-            pydoc_code=None
-        )
+        pytest_code = _run_pytest(venv_cmd=venv_cmd,
+                                  build_information=active_information,
+                                  pytest_log=report_paths['pytest_log'],
+                                  report_dir=report_paths['report_dir'],
+                                  project_root=project_root)
+        build_run_status = BuildRunStatus(lint_codes=lint_codes,
+                                          pytest_code=pytest_code,
+                                          pydoc_code=None)
         current_phase = 'custom_after_test hooks'
         _run_custom_hooks(active_spec.custom_after_test, active_spec,
                           active_information)
         current_phase = 'pydoc-markdown'
-        pydoc_code = _run_pydoc_markdown(
-            venv_cmd=venv_cmd,
-            build_spec=active_spec,
-            build_log=report_paths['build_log'],
-            project_root=project_root
-        )
-        build_run_status = BuildRunStatus(
-            lint_codes=lint_codes,
-            pytest_code=pytest_code,
-            pydoc_code=pydoc_code
-        )
+        pydoc_code = _run_pydoc_markdown(venv_cmd=venv_cmd,
+                                         build_spec=active_spec,
+                                         build_log=report_paths['build_log'],
+                                         project_root=project_root)
+        build_run_status = BuildRunStatus(lint_codes=lint_codes,
+                                          pytest_code=pytest_code,
+                                          pydoc_code=pydoc_code)
         current_phase = 'custom_final hooks'
         _run_custom_hooks(active_spec.custom_final, active_spec,
                           active_information)
@@ -480,45 +423,32 @@ def do_build(python_name: Optional[str] = None,
             print(f'Restored {len(restored_files)} line-ending-only changes.',
                   file=sys.stderr)
         report_context = ReportGenerationContext(
-            build_information=active_information,
-            build_spec=active_spec,
-            report_paths=report_paths,
-            venv_cmd=venv_cmd,
-            build_run_status=build_run_status,
-            build_failure=None,
-            repo_sync_warnings=repo_sync_warnings
-        )
+            build_information=active_information, build_spec=active_spec,
+            report_paths=report_paths, venv_cmd=venv_cmd,
+            build_run_status=build_run_status, build_failure=None,
+            repo_sync_warnings=repo_sync_warnings)
         report_code = _generate_reports(report_context=report_context)
         if pydoc_code != 0:
             return pydoc_code
         return report_code
     except Exception as error:
-        _append_traceback_to_build_log(
-            project_root=project_root,
-            report_paths=report_paths
-        )
+        _append_traceback_to_build_log(project_root=project_root,
+                                       report_paths=report_paths)
         if (reports_enabled and report_paths is not None and
                 venv_cmd is not None):
             _generate_reports_after_failure(
                 report_context=ReportGenerationContext(
                     build_information=active_information,
-                    build_spec=active_spec,
-                    report_paths=report_paths,
-                    venv_cmd=venv_cmd,
-                    build_run_status=build_run_status,
+                    build_spec=active_spec, report_paths=report_paths,
+                    venv_cmd=venv_cmd, build_run_status=build_run_status,
                     build_failure=BuildFailure(
                         phase=current_phase,
-                        detail=_build_failure_detail(error)
-                    ),
-                    repo_sync_warnings=repo_sync_warnings
-                )
-            )
+                        detail=_build_failure_detail(error)),
+                    repo_sync_warnings=repo_sync_warnings))
         raise
     finally:
-        _print_repo_sync_warnings(
-            repo_sync_warnings=repo_sync_warnings,
-            at_build_end=True
-        )
+        _print_repo_sync_warnings(repo_sync_warnings=repo_sync_warnings,
+                                  at_build_end=True)
 
 
 def do_build_cmd(build_spec: Optional[BuildSpec] = None,

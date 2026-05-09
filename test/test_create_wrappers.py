@@ -21,8 +21,7 @@ def test_wrapper_content_target() -> None:
     assert 'if __name__ == \"__main__\":' in content.replace("'", '"')
 
 
-def test_custom_folders_keep_spec(
-        tmp_path: Path) -> None:
+def test_custom_folders_keep_spec(tmp_path: Path) -> None:
     """Test custom folder structure creation does not overwrite custom_spec."""
     custom_path = tmp_path / 'custom_build_tools'
     custom_path.mkdir()
@@ -36,9 +35,8 @@ def test_custom_folders_keep_spec(
     assert existing.read_text(encoding='utf-8') == 'ORIGINAL\n'
 
 
-def test_wrapper_perms_non_windows(
-        monkeypatch: pytest.MonkeyPatch,
-        tmp_path: Path) -> None:
+def test_wrapper_perms_non_windows(monkeypatch: pytest.MonkeyPatch,
+                                   tmp_path: Path) -> None:
     """Test _set_wrapper_permissions sets executable bits on non-Windows."""
     wrapper_path = tmp_path / 'run_build.py'
     wrapper_path.write_text('print(1)\n', encoding='utf-8')
@@ -48,9 +46,8 @@ def test_wrapper_perms_non_windows(
     assert mode == 0o755
 
 
-def test_create_wrappers_files(
-        monkeypatch: pytest.MonkeyPatch,
-        tmp_path: Path) -> None:
+def test_create_wrappers_files(monkeypatch: pytest.MonkeyPatch,
+                               tmp_path: Path) -> None:
     """Test create_wrappers writes expected wrappers and custom folder tree."""
     monkeypatch.setattr(create_wrappers, '_project_root', lambda: tmp_path)
     monkeypatch.setattr(os, 'name', 'nt')

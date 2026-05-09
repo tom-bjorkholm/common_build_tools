@@ -174,9 +174,9 @@ def _parse_pyproject_file(pyproject_path: Path) -> dict[str, Any]:
     }
 
 
-def _check_setup_pyproject_match(
-        package_folder: Path, setup_data: dict[str, Any],
-        pyproject_data: dict[str, Any]) -> None:
+def _check_setup_pyproject_match(package_folder: Path,
+                                 setup_data: dict[str, Any],
+                                 pyproject_data: dict[str, Any]) -> None:
     """Raise ValueError if setup.py and pyproject.toml disagree."""
     for key in ['name', 'version', 'description', 'python_requires']:
         setup_value = setup_data.get(key)
@@ -187,8 +187,7 @@ def _check_setup_pyproject_match(
             raise ValueError(
                 f'Inconsistent {key} in {package_folder}: '
                 f'setup.py has {setup_value!r}, '
-                f'pyproject.toml has {pyproject_value!r}'
-            )
+                f'pyproject.toml has {pyproject_value!r}')
     pyproject_deps = pyproject_data.get('dependencies')
     if pyproject_deps is None:
         return
@@ -198,8 +197,7 @@ def _check_setup_pyproject_match(
     raise ValueError(
         f'Inconsistent dependencies in {package_folder}: '
         'setup.py install_requires and pyproject.toml '
-        '[project].dependencies differ.'
-    )
+        '[project].dependencies differ.')
 
 
 def _combine_package_data(
@@ -213,11 +211,9 @@ def _combine_package_data(
     if pyproject_file is not None:
         pyproject_data = _parse_pyproject_file(pyproject_file)
     if setup_file is not None and pyproject_file is not None:
-        _check_setup_pyproject_match(
-            package_folder=package_folder,
-            setup_data=setup_data,
-            pyproject_data=pyproject_data
-        )
+        _check_setup_pyproject_match(package_folder=package_folder,
+                                     setup_data=setup_data,
+                                     pyproject_data=pyproject_data)
     name_value = setup_data.get('name') or pyproject_data.get('name')
     version_value = setup_data.get('version') or pyproject_data.get('version')
     if not isinstance(name_value, str) or not name_value:
@@ -230,16 +226,13 @@ def _combine_package_data(
     src_folder = package_folder / 'src'
     test_folder = package_folder / 'test'
     return PackageInformation(
-        name=name_value,
-        normalized_name=_normalize_package_name(name_value),
+        name=name_value, normalized_name=_normalize_package_name(name_value),
         version=version_value,
         dependencies=[str(item) for item in dependencies_value],
-        package_folder=package_folder,
-        setup_file=setup_file,
+        package_folder=package_folder, setup_file=setup_file,
         pyproject_file=pyproject_file,
         src_folder=src_folder if src_folder.is_dir() else None,
-        test_folder=test_folder if test_folder.is_dir() else None,
-    )
+        test_folder=test_folder if test_folder.is_dir() else None,)
 
 
 def _load_package_information(package_folder: Path) -> PackageInformation:
@@ -250,8 +243,7 @@ def _load_package_information(package_folder: Path) -> PackageInformation:
     pyproject_path = pyproject_file if pyproject_file.is_file() else None
     if setup_path is None and pyproject_path is None:
         raise ValueError(
-            f'No setup.py or pyproject.toml found in {package_folder}'
-        )
+            f'No setup.py or pyproject.toml found in {package_folder}')
     return _combine_package_data(package_folder=package_folder,
                                  setup_file=setup_path,
                                  pyproject_file=pyproject_path)
@@ -279,10 +271,7 @@ def _extract_dependency_name(requirement: str) -> str:
 
 def _extract_minimum_version(requirement: str) -> Optional[str]:
     """Extract largest minimum version specified with >= in requirement."""
-    matches: list[str] = re.findall(
-        r'>=\s*([A-Za-z0-9_.+\-]+)',
-        requirement
-    )
+    matches: list[str] = re.findall(r'>=\s*([A-Za-z0-9_.+\-]+)', requirement)
     if not matches:
         return None
     best = matches[0]
@@ -292,8 +281,7 @@ def _extract_minimum_version(requirement: str) -> Optional[str]:
     return best
 
 
-def _check_dep_versions(
-        package_information: list[PackageInformation]) -> None:
+def _check_dep_versions(package_information: list[PackageInformation]) -> None:
     """Check that internal dependencies specify >= built package version."""
     by_name = {
         package_data['normalized_name']: package_data
@@ -310,8 +298,7 @@ def _check_dep_versions(
                 raise ValueError(
                     f'Package {package_data["name"]} depends on '
                     f'{required_package["name"]} without >= version '
-                    f'constraint in requirement {requirement!r}.'
-                )
+                    f'constraint in requirement {requirement!r}.')
             if _version_key(min_version) >= _version_key(
                     required_package['version']):
                 continue
@@ -319,8 +306,7 @@ def _check_dep_versions(
                 f'Package {package_data["name"]} depends on '
                 f'{required_package["name"]} with minimum version '
                 f'{min_version}, but built package version is '
-                f'{required_package["version"]}.'
-            )
+                f'{required_package["version"]}.')
 
 
 def _check_identical_versions(build_spec: BuildSpec,
@@ -338,12 +324,10 @@ def _check_identical_versions(build_spec: BuildSpec,
         raise ValueError(
             f'Package versions differ: {package_information[0]["name"]} has '
             f'{first_version}, {package_data["name"]} has '
-            f'{package_data["version"]}.'
-        )
+            f'{package_data["version"]}.')
 
 
-def _dep_edges_for_packages(
-        package_information: list[PackageInformation]) -> \
+def _dep_edges_for_packages(package_information: list[PackageInformation]) -> \
             dict[str, list[str]]:
     """Return graph edges dependency -> dependent for internal packages."""
     by_name = {
@@ -446,8 +430,8 @@ def _merge_and_filter_folders(default_folders: list[Path],
     """Merge defaults and additions, then remove excluded folders."""
     combined: list[Path] = []
     seen: set[Path] = set()
-    for folder in default_folders + _resolve_folder_list(
-            additional_folders, project_root):
+    for folder in default_folders + _resolve_folder_list(additional_folders,
+                                                         project_root):
         if folder in seen:
             continue
         seen.add(folder)
@@ -490,14 +474,12 @@ def discover_build_information(build_spec: BuildSpec,
         default_folders=src_folders + test_folders,
         additional_folders=build_spec.flake8_additional_folders,
         exclude_folders=build_spec.flake8_exclude_folders,
-        project_root=resolved_root
-    )
+        project_root=resolved_root)
     pylint_folders = _merge_and_filter_folders(
         default_folders=src_folders + test_folders,
         additional_folders=build_spec.pylint_additional_folders,
         exclude_folders=build_spec.pylint_exclude_folders,
-        project_root=resolved_root
-    )
+        project_root=resolved_root)
     mypy_defaults = list(src_folders)
     if build_spec.mypy_on_test:
         mypy_defaults.extend(test_folders)
@@ -505,33 +487,25 @@ def discover_build_information(build_spec: BuildSpec,
         default_folders=mypy_defaults,
         additional_folders=build_spec.mypy_additional_folders,
         exclude_folders=build_spec.mypy_exclude_folders,
-        project_root=resolved_root
-    )
+        project_root=resolved_root)
     pytest_folders = _merge_and_filter_folders(
         default_folders=test_folders,
         additional_folders=build_spec.pytest_additional_folders,
         exclude_folders=build_spec.pytest_exclude_folders,
-        project_root=resolved_root
-    )
+        project_root=resolved_root)
     mypy_paths = _merge_and_filter_folders(
-        default_folders=_default_mypy_path_folders(
-            src_folders=src_folders,
-            project_root=resolved_root
-        ),
-        additional_folders=build_spec.mypy_paths,
-        exclude_folders=None,
-        project_root=resolved_root
-    )
-    return BuildInformation(
-        project_root=resolved_root,
-        package_information=package_information,
-        package_install_order=install_order,
-        flake8_folders=flake8_folders,
-        pylint_folders=pylint_folders,
-        mypy_folders=mypy_folders,
-        pytest_folders=pytest_folders,
-        mypy_path_folders=mypy_paths,
-    )
+        default_folders=_default_mypy_path_folders(src_folders=src_folders,
+                                                   project_root=resolved_root),
+        additional_folders=build_spec.mypy_paths, exclude_folders=None,
+        project_root=resolved_root)
+    return BuildInformation(project_root=resolved_root,
+                            package_information=package_information,
+                            package_install_order=install_order,
+                            flake8_folders=flake8_folders,
+                            pylint_folders=pylint_folders,
+                            mypy_folders=mypy_folders,
+                            pytest_folders=pytest_folders,
+                            mypy_path_folders=mypy_paths,)
 
 
 def get_build_information(build_spec: Optional[BuildSpec] = None,

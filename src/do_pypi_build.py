@@ -36,19 +36,13 @@ def do_pypi_build(python_name: Optional[str] = None,
     if active_information is None:
         active_information = get_build_information(active_spec)
     first_result = _run_clean_build_or_fail(
-        python_name=python_name,
-        run_name='First clean build',
-        build_spec=active_spec,
-        build_information=active_information
-    )
+        python_name=python_name, run_name='First clean build',
+        build_spec=active_spec, build_information=active_information)
     if first_result != 0:
         return first_result
     second_result = _run_clean_build_or_fail(
-        python_name=python_name,
-        run_name='Second clean build',
-        build_spec=active_spec,
-        build_information=active_information
-    )
+        python_name=python_name, run_name='Second clean build',
+        build_spec=active_spec, build_information=active_information)
     if second_result != 0:
         return second_result
     if not twine_upload:

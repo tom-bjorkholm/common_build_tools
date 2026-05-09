@@ -16,9 +16,8 @@ from common_build_tools.test.helpers import (
 )
 
 
-def test_clean_removes_artifacts(
-        monkeypatch: pytest.MonkeyPatch,
-        tmp_path: Path) -> None:
+def test_clean_removes_artifacts(monkeypatch: pytest.MonkeyPatch,
+                                 tmp_path: Path) -> None:
     """Test clean removes root and package build artifacts."""
     package_folder = tmp_path / 'package_a'
     (tmp_path / 'build').mkdir()
@@ -35,8 +34,7 @@ def test_clean_removes_artifacts(
     (package_folder / 'dist').mkdir(parents=True)
     package = make_package_information(package_folder=package_folder)
     info = make_build_information(tmp_path, [package])
-    monkeypatch.setattr(clean, 'exit_if_in_virtualenv',
-                        lambda _action: None)
+    monkeypatch.setattr(clean, 'exit_if_in_virtualenv', lambda _action: None)
     clean.clean(build_spec=BuildSpec(), build_information=info)
     assert not (tmp_path / 'build').exists()
     assert not (tmp_path / 'dist').exists()

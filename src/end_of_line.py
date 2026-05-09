@@ -87,61 +87,30 @@ def unix2dos(source_file: Path, target_file: Optional[Path] = None) -> None:
 def _create_argument_parser() -> argparse.ArgumentParser:
     """Create the argument parser for command line EOL conversion."""
     parser = argparse.ArgumentParser(
-        description='Convert files between DOS and Unix line endings.'
-    )
+        description='Convert files between DOS and Unix line endings.')
     subparsers = parser.add_subparsers(dest='command', required=True)
     dos2unix_parser = subparsers.add_parser(
-        'dos2unix',
-        help='Convert CRLF line endings to LF line endings.'
-    )
+        'dos2unix', help='Convert CRLF line endings to LF line endings.')
+    dos2unix_parser.add_argument('-i', '--input', required=True,
+                                 dest='source_file', type=Path,
+                                 help='Input file to convert.')
+    dos2unix_parser.add_argument('-o', '--output', required=False,
+                                 dest='target_file', type=Path, default=None,
+                                 help='Optional output file path.')
     dos2unix_parser.add_argument(
-        '-i',
-        '--input',
-        required=True,
-        dest='source_file',
-        type=Path,
-        help='Input file to convert.'
-    )
+        '--fix-extra-cr-seq', action='store_true',
+        help='Remove extra CR around LF before conversion.')
     dos2unix_parser.add_argument(
-        '-o',
-        '--output',
-        required=False,
-        dest='target_file',
-        type=Path,
-        default=None,
-        help='Optional output file path.'
-    )
-    dos2unix_parser.add_argument(
-        '--fix-extra-cr-seq',
-        action='store_true',
-        help='Remove extra CR around LF before conversion.'
-    )
-    dos2unix_parser.add_argument(
-        '--every-cr-is-new-line',
-        action='store_true',
-        help='Convert remaining CR bytes into LF bytes.'
-    )
+        '--every-cr-is-new-line', action='store_true',
+        help='Convert remaining CR bytes into LF bytes.')
     unix2dos_parser = subparsers.add_parser(
-        'unix2dos',
-        help='Convert LF line endings to CRLF line endings.'
-    )
-    unix2dos_parser.add_argument(
-        '-i',
-        '--input',
-        required=True,
-        dest='source_file',
-        type=Path,
-        help='Input file to convert.'
-    )
-    unix2dos_parser.add_argument(
-        '-o',
-        '--output',
-        required=False,
-        dest='target_file',
-        type=Path,
-        default=None,
-        help='Optional output file path.'
-    )
+        'unix2dos', help='Convert LF line endings to CRLF line endings.')
+    unix2dos_parser.add_argument('-i', '--input', required=True,
+                                 dest='source_file', type=Path,
+                                 help='Input file to convert.')
+    unix2dos_parser.add_argument('-o', '--output', required=False,
+                                 dest='target_file', type=Path, default=None,
+                                 help='Optional output file path.')
     return parser
 
 
@@ -162,17 +131,13 @@ def eol_command(args: Optional[list[str]] = None) -> int:
         return 0 if exc.code == 0 else 1
     try:
         if parsed_args.command == 'dos2unix':
-            dos2unix(
-                source_file=parsed_args.source_file,
-                target_file=parsed_args.target_file,
-                fix_extra_cr_seq=parsed_args.fix_extra_cr_seq,
-                every_cr_is_new_line=parsed_args.every_cr_is_new_line
-            )
+            dos2unix(source_file=parsed_args.source_file,
+                     target_file=parsed_args.target_file,
+                     fix_extra_cr_seq=parsed_args.fix_extra_cr_seq,
+                     every_cr_is_new_line=parsed_args.every_cr_is_new_line)
         else:
-            unix2dos(
-                source_file=parsed_args.source_file,
-                target_file=parsed_args.target_file
-            )
+            unix2dos(source_file=parsed_args.source_file,
+                     target_file=parsed_args.target_file)
     except OSError as exc:
         print(f'Error: {exc}', file=sys.stderr)
         return 1
