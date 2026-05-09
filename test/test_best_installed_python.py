@@ -4,9 +4,9 @@
 # Copyright (c) 2026 Tom Björkholm
 # MIT License
 # pylint: disable=protected-access
-# mypy: disable-error-code=attr-defined
 
 from pathlib import Path
+import shutil
 import stat
 import subprocess
 import pytest
@@ -16,28 +16,26 @@ import best_installed_python
 
 def test_py_launcher_parses_py3(monkeypatch: pytest.MonkeyPatch) -> None:
     """Test py launcher parsing keeps unique Python 3 major versions."""
-    monkeypatch.setattr(best_installed_python.shutil, 'which',
+    monkeypatch.setattr(shutil, 'which',
                         lambda name: 'py' if name == 'py' else None)
     process = subprocess.CompletedProcess(
         args=['py', '--list'], returncode=0,
         stdout=' -V:3.12 * Python 3.12\n -V:2.7 Python 2.7\n'
                ' -3.14-64\n -3.12-64\n', stderr='')
-    monkeypatch.setattr(best_installed_python.subprocess, 'run', lambda *_args,
-                        **_kwargs: process)
+    monkeypatch.setattr(subprocess, 'run', lambda *_args, **_kwargs: process)
     versions = best_installed_python._find_via_py_launcher()
     assert sorted(versions) == [(3, 12), (3, 14)]
 
 
 def test_py_launcher_timeout(monkeypatch: pytest.MonkeyPatch) -> None:
     """Test py launcher discovery returns empty list after timeout."""
-    monkeypatch.setattr(best_installed_python.shutil, 'which',
+    monkeypatch.setattr(shutil, 'which',
                         lambda name: 'py' if name == 'py' else None)
 
     def _raise_timeout(*_args: object, **_kwargs: object) -> None:
         raise subprocess.TimeoutExpired(cmd='py --list', timeout=10)
 
-    monkeypatch.setattr(best_installed_python.subprocess, 'run',
-                        _raise_timeout)
+    monkeypatch.setattr(subprocess, 'run', _raise_timeout)
     assert not best_installed_python._find_via_py_launcher()
 
 

@@ -4,9 +4,10 @@
 # Copyright (c) 2026 Tom Björkholm
 # MIT License
 # pylint: disable=protected-access
-# mypy: disable-error-code=attr-defined
 
 from pathlib import Path
+import platform
+import shutil
 import subprocess
 import pytest
 
@@ -16,7 +17,7 @@ import build_utils
 def test_resolve_python_which(monkeypatch: pytest.MonkeyPatch) -> None:
     """Test resolve_python_command uses shutil.which when available."""
     monkeypatch.setattr(
-        build_utils.shutil, 'which',
+        shutil, 'which',
         lambda name: '/usr/bin/python3.12' if name == 'python3.12' else None)
     result = build_utils.resolve_python_command('python3.12')
     assert result == ['/usr/bin/python3.12']
@@ -24,7 +25,7 @@ def test_resolve_python_which(monkeypatch: pytest.MonkeyPatch) -> None:
 
 def test_resolve_python_falls_back(monkeypatch: pytest.MonkeyPatch) -> None:
     """Test resolve_python_command falls back to py launcher lookup."""
-    monkeypatch.setattr(build_utils.shutil, 'which', lambda _name: None)
+    monkeypatch.setattr(shutil, 'which', lambda _name: None)
     monkeypatch.setattr(build_utils, '_try_py_launcher',
                         lambda _name: ['py', '-3.12'])
     result = build_utils.resolve_python_command('python3.12')
@@ -34,26 +35,25 @@ def test_resolve_python_falls_back(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_py_launcher_success(monkeypatch: pytest.MonkeyPatch) -> None:
     """Test _try_py_launcher returns command when py launcher works."""
     monkeypatch.setattr(build_utils, 'is_windows', lambda: True)
-    monkeypatch.setattr(build_utils.shutil, 'which',
+    monkeypatch.setattr(shutil, 'which',
                         lambda name: '/usr/bin/py' if name == 'py' else None)
     completed = subprocess.CompletedProcess(args=['py', '-3.14', '--version'],
                                             returncode=0,
                                             stdout='Python 3.14.0', stderr='')
-    monkeypatch.setattr(build_utils.subprocess, 'run', lambda *_a, **_k:
-                        completed)
+    monkeypatch.setattr(subprocess, 'run', lambda *_a, **_k: completed)
     assert build_utils._try_py_launcher('python3.14') == ['py', '-3.14']
 
 
 def test_py_launcher_timeout(monkeypatch: pytest.MonkeyPatch) -> None:
     """Test _try_py_launcher handles subprocess timeout by returning empty."""
     monkeypatch.setattr(build_utils, 'is_windows', lambda: True)
-    monkeypatch.setattr(build_utils.shutil, 'which',
+    monkeypatch.setattr(shutil, 'which',
                         lambda name: '/usr/bin/py' if name == 'py' else None)
 
     def _raise_timeout(*_args: object, **_kwargs: object) -> None:
         raise subprocess.TimeoutExpired(cmd='py', timeout=10)
 
-    monkeypatch.setattr(build_utils.subprocess, 'run', _raise_timeout)
+    monkeypatch.setattr(subprocess, 'run', _raise_timeout)
     assert not build_utils._try_py_launcher('python3.14')
 
 
@@ -83,8 +83,7 @@ def test_run_cmd_non_zero(monkeypatch: pytest.MonkeyPatch) -> None:
     """Test run_command returns process code when check is False."""
     completed = subprocess.CompletedProcess(args=['cmd'], returncode=7,
                                             stdout='', stderr='')
-    monkeypatch.setattr(build_utils.subprocess, 'run', lambda *_args,
-                        **_kwargs: completed)
+    monkeypatch.setattr(subprocess, 'run', lambda *_args, **_kwargs: completed)
     result = build_utils.run_command(['cmd'], check=False)
     assert result == 7
 
@@ -93,8 +92,7 @@ def test_run_cmd_exits_non_zero(monkeypatch: pytest.MonkeyPatch) -> None:
     """Test run_command exits on non-zero return when check is True."""
     completed = subprocess.CompletedProcess(args=['cmd'], returncode=5,
                                             stdout='', stderr='')
-    monkeypatch.setattr(build_utils.subprocess, 'run', lambda *_args,
-                        **_kwargs: completed)
+    monkeypatch.setattr(subprocess, 'run', lambda *_args, **_kwargs: completed)
     with pytest.raises(SystemExit) as exc_info:
         build_utils.run_command(['cmd'], check=True)
     assert exc_info.value.code == 5
@@ -150,7 +148,7 @@ def test_append_path_env_order() -> None:
 
 def test_is_windows_platform(monkeypatch: pytest.MonkeyPatch) -> None:
     """Test is_windows returns True only for Windows platform string."""
-    monkeypatch.setattr(build_utils.platform, 'system', lambda: 'Windows')
+    monkeypatch.setattr(platform, 'system', lambda: 'Windows')
     assert build_utils.is_windows() is True
-    monkeypatch.setattr(build_utils.platform, 'system', lambda: 'Linux')
+    monkeypatch.setattr(platform, 'system', lambda: 'Linux')
     assert build_utils.is_windows() is False
