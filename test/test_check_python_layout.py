@@ -48,6 +48,17 @@ def test_skips_open_for_long_indent() -> None:
     assert _rules(source) == []
 
 
+def test_skips_open_for_long_tail() -> None:
+    """Test empty-open is skipped when same-line tail would be too long."""
+    source = (
+        'def function_name_that_is_long(\n'
+        '        first_value: int, second_value_with_long_annotation: '
+        'dict[str, str]) -> None:\n'
+        '    pass\n'
+    )
+    assert _rules(source) == []
+
+
 def test_rejects_more_fits_call() -> None:
     """Test next argument must stay on previous line when it fits."""
     source = 'result = func(first,\n              second)\n'
@@ -60,6 +71,31 @@ def test_skips_move_for_long_suffix() -> None:
         'value = function_with_long_name(first_argument_with_padding,\n'
         '                                second_argument_with_padding'
         ').method_suffix()\n'
+    )
+    assert _rules(source) == []
+
+
+def test_skips_move_for_long_comma() -> None:
+    """Test more-fits counts the comma that moves with an argument."""
+    source = (
+        'def sample() -> None:\n'
+        '    try:\n'
+        "        process = subprocess.run(['py', flag, '--version'],\n"
+        '                                 capture_output=True,\n'
+        '                                 check_argument_name_that_is_long='
+        'False)\n'
+        '    except TimeoutError:\n'
+        '        return\n'
+    )
+    assert _rules(source) == []
+
+
+def test_skips_move_for_multi_line() -> None:
+    """Test more-fits is skipped when the next argument is multi-line."""
+    source = (
+        'write_text(path,\n'
+        "           'first line\\n'\n"
+        "           'second line\\n')\n"
     )
     assert _rules(source) == []
 

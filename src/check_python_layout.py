@@ -213,6 +213,15 @@ def _fits_after(column: int, added_text: str, max_line_length: int) -> bool:
     return column + len(added_text) <= max_line_length
 
 
+def _element_move_text(element: Element) -> str:
+    """Return element text including same-line comma."""
+    if element.text == '':
+        return ''
+    if element.comma_line == element.end_line:
+        return element.text + ','
+    return element.text
+
+
 def _close_suffix(lines: list[str], close_token: TokenInfo) -> str:
     """Return source text from the closing parenthesis to line end."""
     line = _line_text(lines, close_token.start[0])
@@ -256,6 +265,22 @@ def _open_following_lines_fit(tokens: list[TokenInfo], target: Target,
     return True
 
 
+def _open_first_line_tail_fits(tokens: list[TokenInfo], target: Target,
+                               elements: list[Element], lines: list[str],
+                               max_line_length: int) -> bool:
+    """Return whether the first line tail fits after first element moves."""
+    first = elements[0]
+    open_token = tokens[target.open_index]
+    visual_col = open_token.end[1]
+    for element in elements[1:]:
+        if element.start_line != first.start_line:
+            continue
+        line = _line_text(lines, element.start_line).rstrip()
+        shifted_length = len(line) - element.start_col + visual_col
+        return shifted_length <= max_line_length
+    return True
+
+
 def _open_line_violation(tokens: list[TokenInfo], target: Target,
                          elements: list[Element], lines: list[str],
                          max_line_length: int) \
@@ -265,12 +290,15 @@ def _open_line_violation(tokens: list[TokenInfo], target: Target,
     first = elements[0]
     if first.start_line == open_token.start[0] or first.text == '':
         return None
-    added_text = first.text + _element_close_suffix(tokens, target, elements,
-                                                    lines, 0)
+    added_text = _element_move_text(first)
+    added_text += _element_close_suffix(tokens, target, elements, lines, 0)
     if not _fits_after(open_token.end[1], added_text, max_line_length):
         return None
     if not _open_following_lines_fit(tokens, target, elements, lines,
                                      max_line_length):
+        return None
+    if not _open_first_line_tail_fits(tokens, target, elements, lines,
+                                      max_line_length):
         return None
     message = f'Put the first {target.kind} on the opening line.'
     line = open_token.start[0]
@@ -280,11 +308,12 @@ def _open_line_violation(tokens: list[TokenInfo], target: Target,
 
 def _next_element_text(current: Element, next_element: Element) -> str:
     """Return text needed to move next element to current line."""
-    if next_element.text == '':
+    move_text = _element_move_text(next_element)
+    if move_text == '':
         return ''
     if current.comma_line == current.end_line:
-        return ' ' + next_element.text
-    return ', ' + next_element.text
+        return ' ' + move_text
+    return ', ' + move_text
 
 
 def _current_end_column(current: Element) -> int:
@@ -305,10 +334,10 @@ def _more_fits_violations(tokens: list[TokenInfo], target: Target,
         if current.end_line == next_element.start_line:
             continue
         added_text = _next_element_text(current, next_element)
-        added_text += _element_close_suffix(tokens, target, elements, lines,
-                                            index)
         if added_text == '':
             continue
+        added_text += _element_close_suffix(tokens, target, elements, lines,
+                                            index)
         if not _fits_after(_current_end_column(current), added_text,
                            max_line_length):
             continue
