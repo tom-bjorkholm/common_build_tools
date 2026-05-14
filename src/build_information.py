@@ -9,7 +9,7 @@ import os
 from pathlib import Path
 import re
 import tomllib
-from typing import Any, Optional
+from typing import Optional, TypedDict
 
 from build_spec import BuildInformation, BuildSpec, PackageInformation
 from get_build_spec import get_build_spec
@@ -26,6 +26,16 @@ IGNORED_SCAN_DIRS = {
     'reports',
     'venv',
 }
+
+
+class _PackageFileData(TypedDict):
+    """Metadata fields parsed from one package metadata file."""
+
+    name: object
+    version: object
+    description: object
+    python_requires: object
+    dependencies: Optional[list[str]]
 
 
 def _project_root_from_tools() -> Path:
@@ -65,9 +75,9 @@ def _resolve_package_folders(build_spec: BuildSpec,
     return sorted(set(resolved))
 
 
-def _extract_module_literals(module_tree: ast.Module) -> dict[str, Any]:
+def _extract_module_literals(module_tree: ast.Module) -> dict[str, object]:
     """Extract simple top-level assignments that can be literal-evaluated."""
-    literal_values: dict[str, Any] = {}
+    literal_values: dict[str, object] = {}
     for node in module_tree.body:
         if not isinstance(node, ast.Assign):
             continue
@@ -100,7 +110,7 @@ def _find_setup_call(module_tree: ast.Module) -> Optional[ast.Call]:
     return None
 
 
-def _eval_simple_node(node: ast.AST, literals: dict[str, Any]) -> Any:
+def _eval_simple_node(node: ast.AST, literals: dict[str, object]) -> object:
     """Evaluate literal-like AST nodes using known top-level literals."""
     if isinstance(node, ast.Name):
         return literals.get(node.id)
@@ -115,7 +125,7 @@ def _normalize_dependency_string(requirement: str) -> str:
     return re.sub(r'\s+', '', requirement.strip())
 
 
-def _parse_setup_file(setup_path: Path) -> dict[str, Any]:
+def _parse_setup_file(setup_path: Path) -> _PackageFileData:
     """Parse selected metadata from setup.py without executing it."""
     source = setup_path.read_text(encoding='utf-8')
     module_tree = ast.parse(source, filename=str(setup_path))
@@ -123,7 +133,7 @@ def _parse_setup_file(setup_path: Path) -> dict[str, Any]:
     setup_call = _find_setup_call(module_tree)
     if setup_call is None:
         raise ValueError(f'No setup(...) call found in {setup_path}')
-    values: dict[str, Any] = {
+    values: _PackageFileData = {
         'name': None,
         'version': None,
         'description': None,
@@ -150,17 +160,29 @@ def _parse_setup_file(setup_path: Path) -> dict[str, Any]:
     return values
 
 
-def _parse_pyproject_file(pyproject_path: Path) -> dict[str, Any]:
+def _dict_with_str_keys(value: object) -> dict[str, object]:
+    """Return a string-key dictionary from parsed metadata input."""
+    if not isinstance(value, dict):
+        return {}
+    return {
+        key: item for key, item in value.items()
+        if isinstance(key, str)
+    }
+
+
+def _parse_pyproject_file(pyproject_path: Path) -> _PackageFileData:
     """Parse selected metadata from pyproject.toml."""
     with open(pyproject_path, 'rb') as file_obj:
-        pyproject_data = tomllib.load(file_obj)
-    project_data = pyproject_data.get('project', {})
-    dynamic_list = project_data.get('dynamic', [])
+        pyproject_data = _dict_with_str_keys(tomllib.load(file_obj))
+    project_data = _dict_with_str_keys(pyproject_data.get('project', {}))
+    dynamic_value = project_data.get('dynamic', [])
+    dynamic_list = dynamic_value if isinstance(dynamic_value, list) else []
     dependencies: Optional[list[str]]
     if 'dependencies' in dynamic_list:
         dependencies = None
     else:
-        dep_list = project_data.get('dependencies', [])
+        dep_value = project_data.get('dependencies', [])
+        dep_list = dep_value if isinstance(dep_value, list) else []
         dependencies = [
             _normalize_dependency_string(str(item))
             for item in dep_list
@@ -175,12 +197,18 @@ def _parse_pyproject_file(pyproject_path: Path) -> dict[str, Any]:
 
 
 def _check_setup_pyproject_match(package_folder: Path,
-                                 setup_data: dict[str, Any],
-                                 pyproject_data: dict[str, Any]) -> None:
+                                 setup_data: _PackageFileData,
+                                 pyproject_data: _PackageFileData) -> None:
     """Raise ValueError if setup.py and pyproject.toml disagree."""
-    for key in ['name', 'version', 'description', 'python_requires']:
-        setup_value = setup_data.get(key)
-        pyproject_value = pyproject_data.get(key)
+    matched_values = [
+        ('name', setup_data['name'], pyproject_data['name']),
+        ('version', setup_data['version'], pyproject_data['version']),
+        ('description', setup_data['description'],
+         pyproject_data['description']),
+        ('python_requires', setup_data['python_requires'],
+         pyproject_data['python_requires'])
+    ]
+    for key, setup_value, pyproject_value in matched_values:
         if setup_value is None or pyproject_value is None:
             continue
         if str(setup_value) != str(pyproject_value):
@@ -188,10 +216,10 @@ def _check_setup_pyproject_match(package_folder: Path,
                 f'Inconsistent {key} in {package_folder}: '
                 f'setup.py has {setup_value!r}, '
                 f'pyproject.toml has {pyproject_value!r}')
-    pyproject_deps = pyproject_data.get('dependencies')
+    pyproject_deps = pyproject_data['dependencies']
     if pyproject_deps is None:
         return
-    setup_deps = setup_data.get('dependencies', [])
+    setup_deps = setup_data['dependencies'] or []
     if sorted(setup_deps) == sorted(pyproject_deps):
         return
     raise ValueError(
@@ -204,8 +232,20 @@ def _combine_package_data(
         package_folder: Path, setup_file: Optional[Path],
         pyproject_file: Optional[Path]) -> PackageInformation:
     """Combine parsed setup.py and pyproject.toml data into package info."""
-    setup_data: dict[str, Any] = {}
-    pyproject_data: dict[str, Any] = {}
+    setup_data: _PackageFileData = {
+        'name': None,
+        'version': None,
+        'description': None,
+        'python_requires': None,
+        'dependencies': None
+    }
+    pyproject_data: _PackageFileData = {
+        'name': None,
+        'version': None,
+        'description': None,
+        'python_requires': None,
+        'dependencies': None
+    }
     if setup_file is not None:
         setup_data = _parse_setup_file(setup_file)
     if pyproject_file is not None:
@@ -214,15 +254,15 @@ def _combine_package_data(
         _check_setup_pyproject_match(package_folder=package_folder,
                                      setup_data=setup_data,
                                      pyproject_data=pyproject_data)
-    name_value = setup_data.get('name') or pyproject_data.get('name')
-    version_value = setup_data.get('version') or pyproject_data.get('version')
+    name_value = setup_data['name'] or pyproject_data['name']
+    version_value = setup_data['version'] or pyproject_data['version']
     if not isinstance(name_value, str) or not name_value:
         raise ValueError(f'Missing package name in {package_folder}')
     if not isinstance(version_value, str) or not version_value:
         raise ValueError(f'Missing package version in {package_folder}')
-    dependencies_value = setup_data.get('dependencies')
+    dependencies_value = setup_data['dependencies']
     if not isinstance(dependencies_value, list):
-        dependencies_value = pyproject_data.get('dependencies') or []
+        dependencies_value = pyproject_data['dependencies'] or []
     src_folder = package_folder / 'src'
     test_folder = package_folder / 'test'
     return PackageInformation(

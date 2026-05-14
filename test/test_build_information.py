@@ -80,14 +80,14 @@ def test_parse_pyproject_dyn_deps(tmp_path: Path) -> None:
 
 def test_setup_pyproject_mismatch() -> None:
     """Test mismatch between setup.py and pyproject.toml raises ValueError."""
-    setup_data = {
+    setup_data: build_information._PackageFileData = {
         'name': 'pkg-a',
         'version': '1.0.0',
         'description': 'same',
         'python_requires': '>=3.12',
         'dependencies': ['dep>=1.0'],
     }
-    pyproject_data = {
+    pyproject_data: build_information._PackageFileData = {
         'name': 'pkg-a',
         'version': '1.0.1',
         'description': 'same',
