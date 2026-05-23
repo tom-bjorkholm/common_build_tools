@@ -255,9 +255,10 @@ def _open_following_lines_fit(tokens: list[TokenInfo], target: Target,
     """Return whether following lines fit after first element moves."""
     open_token = tokens[target.open_index]
     visual_col = open_token.end[1]
-    old_col = elements[0].start_col
+    first = elements[0]
+    old_col = first.start_col
     close_token = tokens[target.close_index]
-    for line_number in range(elements[0].start_line, close_token.start[0] + 1):
+    for line_number in range(first.end_line + 1, close_token.start[0] + 1):
         line = _line_text(lines, line_number)
         if not line.strip():
             continue
@@ -266,19 +267,21 @@ def _open_following_lines_fit(tokens: list[TokenInfo], target: Target,
     return True
 
 
-def _open_first_line_tail_fits(tokens: list[TokenInfo], target: Target,
-                               elements: list[Element], lines: list[str],
-                               max_line_length: int) -> bool:
-    """Return whether the first line tail fits after first element moves."""
-    first = elements[0]
+def _open_first_line_elements_fit(tokens: list[TokenInfo], target: Target,
+                                  elements: list[Element], lines: list[str],
+                                  max_line_length: int) -> bool:
+    """Return whether same-line remaining elements fit after first moves."""
     open_token = tokens[target.open_index]
     visual_col = open_token.end[1]
-    for element in elements[1:]:
+    first = elements[0]
+    for index, element in enumerate(elements[1:], start=1):
         if element.start_line != first.start_line:
             continue
-        line = _line_text(lines, element.start_line).rstrip()
-        shifted_length = len(line) - element.start_col + visual_col
-        return shifted_length <= max_line_length
+        added_text = _element_move_text(element)
+        added_text += _element_close_suffix(tokens, target, elements, lines,
+                                            index)
+        if not _fits_after(visual_col, added_text, max_line_length):
+            return False
     return True
 
 
@@ -300,8 +303,8 @@ def _open_line_violation(tokens: list[TokenInfo], target: Target,
     if not _open_following_lines_fit(tokens, target, elements, lines,
                                      max_line_length):
         return None
-    if not _open_first_line_tail_fits(tokens, target, elements, lines,
-                                      max_line_length):
+    if not _open_first_line_elements_fit(tokens, target, elements, lines,
+                                         max_line_length):
         return None
     message = f'Put the first {target.kind} on the opening line.'
     line = open_token.start[0]

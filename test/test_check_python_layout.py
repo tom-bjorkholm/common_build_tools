@@ -48,12 +48,36 @@ def test_skips_open_for_long_indent() -> None:
     assert _rules(source) == []
 
 
-def test_skips_open_for_long_tail() -> None:
-    """Test empty-open is skipped when same-line tail would be too long."""
+@pytest.mark.parametrize('source', [
+    'def func(\n'
+    '        file_access: FileAccess, capabilities: Capabilities,\n'
+    '        error_file: TextIO = NO_ERROR_OUTPUT) -> None:\n'
+    '    pass\n',
+    'value = func(\n'
+    '        first_arg, second_arg_with_a_name_that_makes_tail_long,\n'
+    '        third_arg)\n'])
+def test_rejects_open_long_tail(source: str) -> None:
+    """Test only the first same-line item has to fit after open."""
+    assert layout.RULE_EMPTY_OPEN in _rules(source)
+
+
+def test_skips_open_long_tail() -> None:
+    """Test empty-open is skipped when a later same-line item is too long."""
     source = (
         'def function_name_that_is_long(\n'
         '        first_value: int, second_value_with_long_annotation: '
         'dict[str, str]) -> None:\n'
+        '    pass\n'
+    )
+    assert _rules(source) == []
+
+
+def test_skips_open_long_following() -> None:
+    """Test empty-open is skipped when later lines would be too long."""
+    source = (
+        'def function_name_that_is_long(\n'
+        '        first_value: int,\n'
+        '        second_value_with_long_annotation: dict[str, str]) -> None:\n'
         '    pass\n'
     )
     assert _rules(source) == []
