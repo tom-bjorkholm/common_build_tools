@@ -240,43 +240,13 @@ def _element_close_suffix(tokens: list[TokenInfo], target: Target,
     return _close_suffix(lines, close_token)
 
 
-def _shifted_line_fits(line: str, old_col: int, new_col: int,
-                       max_line_length: int) -> bool:
-    """Return whether line fits after shifting indentation."""
-    if line[:old_col].strip():
-        return True
-    shifted_length = len(line) - old_col + new_col
-    return shifted_length <= max_line_length
-
-
-def _open_following_lines_fit(tokens: list[TokenInfo], target: Target,
-                              elements: list[Element], lines: list[str],
-                              max_line_length: int) -> bool:
-    """Return whether following lines fit after first element moves."""
+def _open_remaining_fit(tokens: list[TokenInfo], target: Target,
+                        elements: list[Element], lines: list[str],
+                        max_line_length: int) -> bool:
+    """Return whether remaining elements fit below the opening line."""
     open_token = tokens[target.open_index]
     visual_col = open_token.end[1]
-    first = elements[0]
-    old_col = first.start_col
-    close_token = tokens[target.close_index]
-    for line_number in range(first.end_line + 1, close_token.start[0] + 1):
-        line = _line_text(lines, line_number)
-        if not line.strip():
-            continue
-        if not _shifted_line_fits(line, old_col, visual_col, max_line_length):
-            return False
-    return True
-
-
-def _open_first_line_elements_fit(tokens: list[TokenInfo], target: Target,
-                                  elements: list[Element], lines: list[str],
-                                  max_line_length: int) -> bool:
-    """Return whether same-line remaining elements fit after first moves."""
-    open_token = tokens[target.open_index]
-    visual_col = open_token.end[1]
-    first = elements[0]
     for index, element in enumerate(elements[1:], start=1):
-        if element.start_line != first.start_line:
-            continue
         added_text = _element_move_text(element)
         added_text += _element_close_suffix(tokens, target, elements, lines,
                                             index)
@@ -289,7 +259,7 @@ def _open_line_violation(tokens: list[TokenInfo], target: Target,
                          elements: list[Element], lines: list[str],
                          max_line_length: int) \
         -> Optional[LayoutViolation]:
-    """Return violation when the first element should be on the open line."""
+    """Return violation when an element fits on the opening line."""
     open_token = tokens[target.open_index]
     first = elements[0]
     if first.start_line == open_token.start[0] or first.text == '':
@@ -300,13 +270,13 @@ def _open_line_violation(tokens: list[TokenInfo], target: Target,
     added_text += _element_close_suffix(tokens, target, elements, lines, 0)
     if not _fits_after(open_token.end[1], added_text, max_line_length):
         return None
-    if not _open_following_lines_fit(tokens, target, elements, lines,
-                                     max_line_length):
+    if not _open_remaining_fit(tokens, target, elements, lines,
+                               max_line_length):
         return None
-    if not _open_first_line_elements_fit(tokens, target, elements, lines,
-                                         max_line_length):
-        return None
-    message = f'Put the first {target.kind} on the opening line.'
+    message = (
+        f'At least one {target.kind} fits on the same line as the opening '
+        'parenthesis.'
+    )
     line = open_token.start[0]
     column = open_token.start[1] + 1
     return LayoutViolation(Path(), line, column, RULE_EMPTY_OPEN, message)
