@@ -1,0 +1,27 @@
+#! /usr/bin/env python3
+"""Fixture for python-layout empty opening argument checks."""
+
+from pathlib import Path
+import sys
+from typing import Optional
+
+from tableio import FileAccess, access_capabilities
+from tableio_cfg_json import tio_json_config_default
+
+
+def create_config_files(config_file: Path, file_access: FileAccess,
+                        format_name: Optional[str],
+                        complete: bool) -> None:
+    """Write a JSON config file."""
+    # TableIO chooses implementations by matching requested capabilities.
+    # A beginner can read this as: choose the backend for what this small
+    # program will actually do, not for every possible TableIO feature.
+    capabilities = access_capabilities(file_access, error_file=sys.stderr)
+    # tio_json_config_default() asks TableIO for the recommended durable
+    # values, then wraps them in a config-as-json Config object. The same
+    # object can therefore be written as JSON and later passed back to
+    # TableIO as normal configuration data.
+    config = tio_json_config_default(
+        capabilities=capabilities, file_access=file_access,
+        format_name=format_name, include_all_options=complete)
+    config.write(to_json_filename=config_file)

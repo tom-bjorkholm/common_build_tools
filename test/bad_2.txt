@@ -1,0 +1,25 @@
+#! /usr/bin/env python3
+"""Fixture for python-layout empty opening argument checks."""
+
+from pathlib import Path
+from typing import Optional
+
+from tableio import FileAccess
+from tableio_cfg_json import describe_config, get_general_cfg_info
+
+
+def create_config_files(syntax_file: Path, file_access: FileAccess,
+                        format_name: Optional[str],
+                        complete: bool) -> None:
+    """Write a matching syntax guide."""
+    capabilities = []
+    # The syntax text is deliberately written next to the JSON file. In a
+    # real application you can give this text to users as the reference for
+    # editing the configuration file by hand.
+    syntax_parts = [
+        get_general_cfg_info(),
+        describe_config(
+            capabilities=capabilities, file_access=file_access,
+            format_name=format_name, include_compact_example=not complete,
+            include_full_example=complete)]
+    syntax_file.write_text('\n\n'.join(syntax_parts) + '\n', encoding='utf-8')

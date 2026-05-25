@@ -5,9 +5,16 @@
 # MIT License
 
 from pathlib import Path
+from tempfile import TemporaryDirectory
 import pytest
 
 import check_python_layout as layout
+
+EXPECTED_EMPTY_OPEN_WORDS = (
+    'argument',
+    'same line',
+    'opening parenthesis'
+)
 
 
 def _rules(source: str) -> list[str]:
@@ -23,6 +30,47 @@ def _guidance(source: str, changed_lines: set[int], max_len: int = 8) \
     """Return long-name guidance for source."""
     return layout.check_guidance_source(Path('sample.py'), source,
                                         changed_lines, max_len)
+
+
+def _copy_bad_fixture(fixture_name: str, tmp_dir: str) -> Path:
+    """Copy one bad fixture to a temporary Python file."""
+    fixture_path = Path(__file__).with_name(fixture_name)
+    target_path = Path(tmp_dir) / 'bad_xx.py'
+    source = fixture_path.read_text(encoding='utf-8')
+    target_path.write_text(source, encoding='utf-8')
+    return target_path
+
+
+def _has_empty_open_message(text: str) -> bool:
+    """Return True when text explains the empty-open argument failure."""
+    lowered_text = text.lower()
+    return all(word in lowered_text for word in EXPECTED_EMPTY_OPEN_WORDS)
+
+
+def _has_empty_open_error(violations: list[layout.LayoutViolation]) -> bool:
+    """Return True when violations contain the expected empty-open error."""
+    return any(
+        violation.rule == layout.RULE_EMPTY_OPEN and
+        _has_empty_open_message(violation.message)
+        for violation in violations)
+
+
+@pytest.mark.parametrize('fixture_name', ['bad_1.txt', 'bad_2.txt'])
+def test_rejects_empty_open_depdoc(fixture_name: str,
+                                   capsys: pytest.CaptureFixture[str]) \
+        -> None:
+    """Test real depdoc snippets reject empty opening argument lines."""
+    with TemporaryDirectory() as tmp_dir:
+        bad_file = _copy_bad_fixture(fixture_name, tmp_dir)
+        violations = layout.check_paths([bad_file])
+        api_found = _has_empty_open_error(violations)
+        exit_code = layout.main(['--no-name-guidance', str(bad_file)])
+        output = capsys.readouterr().out
+    main_found = exit_code == 1 and _has_empty_open_message(output)
+    assert {'api': api_found, 'main': main_found} == {
+        'api': True,
+        'main': True
+    }
 
 
 def test_accepts_compact_call() -> None:
