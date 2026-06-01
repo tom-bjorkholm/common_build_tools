@@ -66,6 +66,11 @@ def _create_or_recreate_venv(python_cmd: list[str],
     if venv_path.exists():
         return
     run_command([*python_cmd, '-m', 'venv', 'venv'])
+    # upgrade pip to latest version so it can read pip cache
+    run_command([*python_cmd, '-m', 'pip', 'install', '--upgrade', 'pip',
+                 '--no-cache-dir'])
+    run_command([str(venv_path / 'bin' / 'python'), '-m', 'pip', 'install',
+                 '--upgrade', 'pip', '--no-cache-dir'])
 
 
 def _normalize_package_name(package_name: str) -> str:
