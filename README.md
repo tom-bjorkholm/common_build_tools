@@ -89,8 +89,8 @@ project specific information from return value (of type `BuildSpec`) from
 function `custom_spec()` in file `./custom_build_tools/custom_spec.py`.
 If this file is not found, this function is not found, or if the function
 returns `None` the default configuration is used.
-The configuration returned by `custom_spec()` only need to include the
-changed compared to the default configuration.
+The configuration returned by `custom_spec()` only needs to include the
+changes compared to the default configuration.
 
 Default folder discovery for linting and tests includes every `src` and
 `test` folder in the repository, including `custom_build_tools/src` and
@@ -128,7 +128,7 @@ build flow are (from a user's point of view):
    are run.
 
 6. Build discovered packages.
-   The specified of discovered packages are built into .whl files.
+   The specified or discovered packages are built into .whl files.
 
 7. Run `custom_before_install` hooks.
    If `custom_before_install` hooks are configured in the `BuildSpec` they
@@ -179,7 +179,7 @@ There are 3 entry point scripts (and 2 extra convenience scripts) for building t
 - `./common_build_tools/src/do_build.py` Run this script to build an installation package (.whl) and
   to run the tests on it in a venv (virtual environment).
 
-- `./common_build_tools/src/clean.py` Deletes all files that was produced by the build to start over
+- `./common_build_tools/src/clean.py` Deletes all files that were produced by the build to start over
   from a clean state.
 
 - `./common_build_tools/src/clean_build.py` Combines the use of `clean.py`, `setup_build_environment.py`
