@@ -32,6 +32,8 @@ def test_clean_removes_artifacts(monkeypatch: pytest.MonkeyPatch,
     (tmp_path / '.coverage.extra').write_text('data', encoding='utf-8')
     (package_folder / 'build').mkdir(parents=True)
     (package_folder / 'dist').mkdir(parents=True)
+    (package_folder / '.pytest_cache').mkdir(parents=True)
+    (package_folder / '.mypy_cache').mkdir(parents=True)
     package = make_package_information(package_folder=package_folder)
     info = make_build_information(tmp_path, [package])
     monkeypatch.setattr(clean, 'exit_if_in_virtualenv', lambda _action: None)
@@ -48,6 +50,8 @@ def test_clean_removes_artifacts(monkeypatch: pytest.MonkeyPatch,
     assert not (tmp_path / '.coverage.extra').exists()
     assert not (package_folder / 'build').exists()
     assert not (package_folder / 'dist').exists()
+    assert not (package_folder / '.pytest_cache').exists()
+    assert not (package_folder / '.mypy_cache').exists()
 
 
 def test_remove_matching_paths(tmp_path: Path) -> None:

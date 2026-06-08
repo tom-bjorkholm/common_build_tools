@@ -28,6 +28,8 @@ PATTERNS_TO_REMOVE = [
     '*~',
     '*.egg-info',
     '*.pyc',
+    '.pytest_cache',
+    '.mypy_cache',
     '.coverage',
     '.tox',
     'nosetests.xml',
