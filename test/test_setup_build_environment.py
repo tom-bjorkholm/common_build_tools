@@ -53,7 +53,9 @@ def test_venv_install_list_sources() -> None:
     assert install_list[0] == 'pip'
     assert 'requests>=2.0' in install_list
     assert 'extra-package' in install_list
-    assert install_list[-1] == 'twine==6.0.1'
+    pinned = setup_build_environment.VENV_PINNED_PACKAGES
+    assert install_list[-len(pinned):] == pinned
+    assert 'twine==6.0.1' in pinned
 
 
 def test_setup_env_runs_steps(monkeypatch: pytest.MonkeyPatch) -> None:

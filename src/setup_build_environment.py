@@ -30,7 +30,6 @@ VENV_PACKAGES = [
     'build',
     'setuptools',
     'wheel',
-    'pytest',
     'pytest-html',
     'pytest-cov',
     'flake8',
@@ -47,7 +46,10 @@ VENV_PACKAGES = [
     'flake8-docstrings'
 ]
 
-VENV_PINNED_PACKAGES = ['twine==6.0.1']
+# pytest is pinned below 9.1 because pytest 9.1 removed the 'path'
+# parameter from the pytest_collect_file hookspec, which breaks the
+# pytest-flake8 plugin with a PluginValidationError at startup.
+VENV_PINNED_PACKAGES = ['twine==6.0.1', 'pytest<9.1']
 
 
 def _install_global_packages(python_cmd: list[str]) -> None:
