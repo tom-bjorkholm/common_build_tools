@@ -251,13 +251,21 @@ def test_pytest_cmd_flags(tmp_path: Path) -> None:
     info['pylint_folders'] = [tmp_path / 'src']
     (tmp_path / '.pylintrc').write_text('[MAIN]\n', encoding='utf-8')
     report_dir = tmp_path / 'reports'
-    command = do_build._pytest_command(['venv/bin/python'], info, report_dir)
+    report_dir.mkdir(parents=True, exist_ok=True)
+    cov_config = do_build._write_cov_config(info, report_dir)
+    command = do_build._pytest_command(['venv/bin/python'], info, report_dir,
+                                       cov_config)
     command_text = ' '.join(command)
     assert command[:3] == ['venv/bin/python', '-m', 'pytest']
     assert '--self-contained-html' in command
     assert '--pylint' in command
     assert f'--pylint-rcfile={tmp_path / ".pylintrc"}' in command
-    assert '--cov=pkg_one' in command
+    assert '--cov' in command
+    assert cov_config is not None
+    assert f'--cov-config={cov_config}' in command
+    config_text = cov_config.read_text(encoding='utf-8')
+    assert 'source_pkgs' in config_text
+    assert 'pkg_one' in config_text
     assert 'pytest_report.html' in command_text
 
 

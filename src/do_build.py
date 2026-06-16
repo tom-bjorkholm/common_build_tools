@@ -214,8 +214,30 @@ def _pytest_collection_folders(
     return unique_folders
 
 
+def _write_cov_config(build_information: BuildInformation,
+                      report_dir: Path) -> Optional[Path]:
+    """Write a coverage config and return its path, or None.
+
+    Coverage treats a ``--cov`` value as a directory when a folder of
+    that name exists in the working directory. With one project folder
+    per package that folder shadows the package, so coverage measures
+    the test folder instead of the installed package. Listing packages
+    under ``source_pkgs`` makes coverage resolve them as importable
+    packages regardless of same-named folders. Returns None when no
+    packages were discovered, which leaves coverage disabled.
+    """
+    packages = build_information['package_information']
+    names = [data['normalized_name'] for data in packages]
+    if not names:
+        return None
+    lines = ['[run]', 'source_pkgs ='] + [f'    {name}' for name in names]
+    config_path = report_dir / 'coverage_config.ini'
+    config_path.write_text('\n'.join(lines) + '\n', encoding='utf-8')
+    return config_path
+
+
 def _pytest_command(venv_cmd: list[str], build_information: BuildInformation,
-                    report_dir: Path) -> list[str]:
+                    report_dir: Path, cov_config: Optional[Path]) -> list[str]:
     """Construct pytest command for discovered test and pylint folders."""
     command = [*venv_cmd, '-m', 'pytest']
     command.extend(
@@ -230,8 +252,8 @@ def _pytest_command(venv_cmd: list[str], build_information: BuildInformation,
     pylint_rcfile = report_dir.parent / '.pylintrc'
     if pylint_rcfile.is_file():
         command.append(f'--pylint-rcfile={pylint_rcfile}')
-    for package_data in build_information['package_information']:
-        command.append(f'--cov={package_data["normalized_name"]}')
+    if cov_config is not None:
+        command.extend(['--cov', f'--cov-config={cov_config}'])
     return command
 
 
@@ -246,10 +268,11 @@ def _run_pytest(venv_cmd: list[str], build_information: BuildInformation,
                               encoding='utf-8')
         return 0
     pylint_log.touch(exist_ok=True)
+    cov_config = _write_cov_config(build_information, report_dir)
     return run_command_logged(
         _pytest_command(venv_cmd=venv_cmd, build_information=build_information,
-                        report_dir=report_dir), log_file=pytest_log,
-        check=False, cwd=project_root,)
+                        report_dir=report_dir, cov_config=cov_config),
+        log_file=pytest_log, check=False, cwd=project_root,)
 
 
 def _run_pydoc_markdown(venv_cmd: list[str], build_spec: BuildSpec,
