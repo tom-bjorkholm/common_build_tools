@@ -21,15 +21,16 @@ from build_utils import (
 )
 from get_build_spec import get_build_spec
 
-GLOBAL_PACKAGES = ['pip', 'gitpython']
+GLOBAL_PACKAGES = ['pip', 'gitpython', 'twine']
 
-GLOBAL_PINNED_PACKAGES = ['twine==6.0.1']
+GLOBAL_PINNED_PACKAGES: list[str] = []
 
 VENV_PACKAGES = [
     'pip',
     'build',
     'setuptools',
     'wheel',
+    'twine',
     'pytest-html',
     'pytest-cov',
     'flake8',
@@ -49,7 +50,7 @@ VENV_PACKAGES = [
 # pytest is pinned below 9.1 because pytest 9.1 removed the 'path'
 # parameter from the pytest_collect_file hookspec, which breaks the
 # pytest-flake8 plugin with a PluginValidationError at startup.
-VENV_PINNED_PACKAGES = ['twine==6.0.1', 'pytest<9.1']
+VENV_PINNED_PACKAGES = ['pytest<9.1']
 
 
 def _install_global_packages(python_cmd: list[str]) -> None:

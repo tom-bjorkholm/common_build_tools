@@ -156,6 +156,18 @@ def _build_packages(venv_cmd: list[str], build_information: BuildInformation,
     return 0
 
 
+def _twine_check_dist(venv_cmd: list[str], build_log: Path, dist_dir: Path,
+                      project_root: Path) -> int:
+    """Validate built distributions with twine check."""
+    dist_files = sorted(str(path) for path in dist_dir.glob('*')
+                        if path.is_file())
+    if not dist_files:
+        return 0
+    return run_command_logged([*venv_cmd, '-m', 'twine', 'check', *dist_files],
+                              log_file=build_log, check=False,
+                              cwd=project_root)
+
+
 def _wheel_regex_for_package(package_name: str) -> re.Pattern[str]:
     """Return regex for wheel files of one package."""
     escaped_name = ''.join(
@@ -396,6 +408,13 @@ def do_build(python_name: Optional[str] = None,
                                      project_root=project_root)
         if build_code != 0:
             return build_code
+        current_phase = 'twine check distributions'
+        twine_code = _twine_check_dist(venv_cmd=venv_cmd,
+                                       build_log=report_paths['build_log'],
+                                       dist_dir=report_paths['dist_dir'],
+                                       project_root=project_root)
+        if twine_code != 0:
+            return twine_code
         current_phase = 'custom_before_install hooks'
         _run_custom_hooks(active_spec.custom_before_install, active_spec,
                           active_information)
