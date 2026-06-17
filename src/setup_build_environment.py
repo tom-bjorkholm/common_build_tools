@@ -44,7 +44,8 @@ VENV_PACKAGES = [
     'pytest-flake8',
     'pytest-pylint',
     'pytest-skip-slow',
-    'flake8-docstrings'
+    'flake8-docstrings',
+    'readme_renderer[md]'
 ]
 
 # pytest is pinned below 9.1 because pytest 9.1 removed the 'path'
