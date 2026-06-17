@@ -217,6 +217,12 @@ performed.
 The "testing" includes flake8, mypy, python-layout and pytest with
 pytest-pylint.
 
+#### Coverage
+
+A coverage report is created when running the build and tests.
+The build system creates the file `./reports/coverage_config.ini`
+with names of the detected packages that will be tested `./venv`.
+
 #### python-layout
 
 The build step is reported as `python-layout`. The standalone checker script
