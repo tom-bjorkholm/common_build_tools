@@ -265,6 +265,7 @@ def test_pytest_cmd_flags(tmp_path: Path) -> None:
     assert f'--cov-config={cov_config}' in command
     config_text = cov_config.read_text(encoding='utf-8')
     assert 'source_pkgs' in config_text
+    assert 'branch = True' in config_text
     assert 'pkg_one' in config_text
     assert 'pytest_report.html' in command_text
 

@@ -230,7 +230,8 @@ def _write_cov_config(build_information: BuildInformation,
     names = [data['normalized_name'] for data in packages]
     if not names:
         return None
-    lines = ['[run]', 'source_pkgs ='] + [f'    {name}' for name in names]
+    lines = (['[run]', 'branch = True', 'source_pkgs ='] +
+             [f'    {name}' for name in names])
     config_path = report_dir / 'coverage_config.ini'
     config_path.write_text('\n'.join(lines) + '\n', encoding='utf-8')
     return config_path
