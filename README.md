@@ -37,7 +37,7 @@ To set up another git repo to start using this repo as submodule use the command
 
 ````sh
 cd root_of_repo
-git submodule add -b master git@bitbucket.org:tom-bjorkholm/common_build_tools.git common_build_tools
+git submodule add -b master git@github.com:tom-bjorkholm/common_build_tools.git common_build_tools
 ````
 
 ## How these common build tools are designed
