@@ -250,11 +250,15 @@ def _write_cov_config(build_information: BuildInformation,
 
 
 def _pytest_command(venv_cmd: list[str], build_information: BuildInformation,
-                    report_dir: Path, cov_config: Optional[Path]) -> list[str]:
+                    report_dir: Path, cov_config: Optional[Path],
+                    excluded_markers: list[str]) -> list[str]:
     """Construct pytest command for discovered test and pylint folders."""
     command = [*venv_cmd, '-m', 'pytest']
     command.extend(
         str(path) for path in _pytest_collection_folders(build_information))
+    if excluded_markers:
+        expr = ' or '.join(excluded_markers)
+        command.extend(['-m', f'not ({expr})'])
     command.extend([
         f'--html={report_dir / "pytest_report.html"}',
         '--self-contained-html',
@@ -271,8 +275,10 @@ def _pytest_command(venv_cmd: list[str], build_information: BuildInformation,
 
 
 def _run_pytest(venv_cmd: list[str], build_information: BuildInformation,
-                pytest_log: Path, report_dir: Path, project_root: Path) -> int:
+                pytest_log: Path, report_dir: Path, project_root: Path,
+                excluded_markers: list[str]) -> int:
     """Run pytest and return pytest exit code."""
+    # pylint: disable=too-many-arguments,too-many-positional-arguments
     pylint_log = report_dir / PYLINT_LOG_NAME
     if not _pytest_collection_folders(build_information):
         pytest_log.write_text('No pytest targets discovered.\n',
@@ -284,7 +290,8 @@ def _run_pytest(venv_cmd: list[str], build_information: BuildInformation,
     cov_config = _write_cov_config(build_information, report_dir)
     return run_command_logged(
         _pytest_command(venv_cmd=venv_cmd, build_information=build_information,
-                        report_dir=report_dir, cov_config=cov_config),
+                        report_dir=report_dir, cov_config=cov_config,
+                        excluded_markers=excluded_markers),
         log_file=pytest_log, check=False, cwd=project_root,)
 
 
@@ -439,11 +446,13 @@ def do_build(python_name: Optional[str] = None,
         build_run_status = BuildRunStatus(lint_codes=lint_codes,
                                           pytest_code=None, pydoc_code=None)
         current_phase = 'pytest'
+        excl_markers = active_spec.excluded_test_markers
         pytest_code = _run_pytest(venv_cmd=venv_cmd,
                                   build_information=active_information,
                                   pytest_log=report_paths['pytest_log'],
                                   report_dir=report_paths['report_dir'],
-                                  project_root=project_root)
+                                  project_root=project_root,
+                                  excluded_markers=excl_markers)
         build_run_status = BuildRunStatus(lint_codes=lint_codes,
                                           pytest_code=pytest_code,
                                           pydoc_code=None)

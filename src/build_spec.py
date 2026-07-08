@@ -120,6 +120,15 @@ class BuildSpec(NamedTuple):
     pytest_additional_folders: Optional[list[Path]] = None
     """Additional folders to include in pytest run."""
 
+    excluded_test_markers: list[str] = []
+    """Pytest markers to exclude from the build test run.
+
+    Tests decorated with any of these markers are deselected (not
+    collected) during the build, so they do not appear in the test
+    summary as skipped. They can be run manually by passing the marker
+    expression directly to pytest, e.g. ``pytest -m focus_sensitive``.
+    """
+
     mypy_exclude_folders: Optional[list[Path]] = None
     """Folders to exclude from mypy run."""
 

@@ -254,7 +254,7 @@ def test_pytest_cmd_flags(tmp_path: Path) -> None:
     report_dir.mkdir(parents=True, exist_ok=True)
     cov_config = do_build._write_cov_config(info, report_dir)
     command = do_build._pytest_command(['venv/bin/python'], info, report_dir,
-                                       cov_config)
+                                       cov_config, excluded_markers=[])
     command_text = ' '.join(command)
     assert command[:3] == ['venv/bin/python', '-m', 'pytest']
     assert '--self-contained-html' in command
@@ -268,6 +268,32 @@ def test_pytest_cmd_flags(tmp_path: Path) -> None:
     assert 'branch = True' in config_text
     assert 'pkg_one' in config_text
     assert 'pytest_report.html' in command_text
+
+
+def test_pytest_excl_markers(tmp_path: Path) -> None:
+    """Test excluded_markers adds a negating -m expression."""
+    package_folder = tmp_path / 'pkg-one'
+    package_folder.mkdir(parents=True, exist_ok=True)
+    package = make_package_information(package_folder=package_folder,
+                                       name='pkg-one')
+    info = make_build_information(tmp_path, [package])
+    info['pytest_folders'] = [tmp_path / 'test']
+    report_dir = tmp_path / 'reports'
+    report_dir.mkdir(parents=True, exist_ok=True)
+    cov_config = do_build._write_cov_config(info, report_dir)
+    pcmd = do_build._pytest_command
+    cmd_none = pcmd(['venv/bin/python'], info, report_dir, cov_config,
+                    excluded_markers=[])
+    cmd_one = pcmd(['venv/bin/python'], info, report_dir, cov_config,
+                   excluded_markers=['focus_sensitive'])
+    markers_two = ['focus_sensitive', 'slow']
+    cmd_two = pcmd(['venv/bin/python'], info, report_dir, cov_config,
+                   excluded_markers=markers_two)
+    assert 'not (focus_sensitive)' not in cmd_none
+    m_idx = cmd_one.index('-m', 3)
+    assert cmd_one[m_idx + 1] == 'not (focus_sensitive)'
+    m_idx2 = cmd_two.index('-m', 3)
+    assert cmd_two[m_idx2 + 1] == 'not (focus_sensitive or slow)'
 
 
 def test_parse_summary_latest(tmp_path: Path) -> None:
