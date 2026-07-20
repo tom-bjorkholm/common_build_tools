@@ -10,4 +10,5 @@ WRAPPER_FILES: tuple[tuple[str, str], ...] = (
     ('run_pypi_build.py', 'do_pypi_build'),
     ('run_clean.py', 'clean'),
     ('run_setup_build_environment.py', 'setup_build_environment'),
+    ('run_static_checks.py', 'static_checks'),
 )
