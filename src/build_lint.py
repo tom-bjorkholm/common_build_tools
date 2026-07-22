@@ -8,7 +8,8 @@ import os
 from pathlib import Path
 
 from build_spec import BuildInformation, BuildSpec
-from build_utils import append_to_path_env, run_command_logged
+from build_utils import (append_to_path_env, run_command_logged,
+                         venv_script)
 
 
 def _run_mypy(venv_cmd: list[str], build_information: BuildInformation,
@@ -108,10 +109,56 @@ def _python_layout_command(venv_cmd: list[str], build_spec: BuildSpec,
     return command
 
 
+def _pylint_command(venv_cmd: list[str], build_information: BuildInformation,
+                    json_path: Path, project_root: Path) -> list[str]:
+    """Return pylint command writing both text and JSON output.
+
+    All discovered folders are passed in a single invocation so that
+    cross-file findings such as duplicate-code (R0801) are detected.
+    ``--recursive=y`` lets pylint lint folders that are not packages
+    (folders without a top-level ``__init__.py``).
+    """
+    command = [*venv_cmd, '-m', 'pylint', '--recursive=y',
+               f'--output-format=text,json:{json_path}']
+    rcfile = project_root / '.pylintrc'
+    if rcfile.is_file():
+        command.append(f'--rcfile={rcfile}')
+    command.extend(str(path) for path in build_information['pylint_folders'])
+    return command
+
+
+def _write_pylint_html(json_path: Path, pylint_dir: Path,
+                       project_root: Path) -> None:
+    """Convert pylint JSON output into an HTML report."""
+    if not json_path.is_file():
+        return
+    run_command_logged(
+        [venv_script('pylint-json2html'), '-f', 'json', '-o',
+         str(pylint_dir / 'index.html'), str(json_path)],
+        log_file=pylint_dir / 'json2html_log.txt', check=False,
+        cwd=project_root)
+
+
+def _run_pylint(venv_cmd: list[str], build_information: BuildInformation,
+                pylint_log: Path, pylint_dir: Path, project_root: Path) -> int:
+    """Run pylint on discovered folders and build an HTML report."""
+    if not build_information['pylint_folders']:
+        pylint_log.write_text('No pylint targets discovered.\n',
+                              encoding='utf-8')
+        return 0
+    json_path = pylint_dir / 'pylint.json'
+    exit_code = run_command_logged(
+        _pylint_command(venv_cmd, build_information, json_path, project_root),
+        log_file=pylint_log, check=False, cwd=project_root)
+    _write_pylint_html(json_path=json_path, pylint_dir=pylint_dir,
+                       project_root=project_root)
+    return exit_code
+
+
 def _run_linters(venv_cmd: list[str], build_information: BuildInformation,
                  report_paths: dict[str, Path], project_root: Path,
                  build_spec: BuildSpec) -> dict[str, int]:
-    """Run mypy, flake8 and python-layout and return their exit codes."""
+    """Run mypy, flake8, pylint and python-layout, return their codes."""
     mypy_code = _run_mypy(venv_cmd=venv_cmd,
                           build_information=build_information,
                           mypy_log=report_paths['mypy_log'],
@@ -122,6 +169,11 @@ def _run_linters(venv_cmd: list[str], build_information: BuildInformation,
                               flake_log=report_paths['flake_log'],
                               flake_dir=report_paths['flake_dir'],
                               project_root=project_root)
+    pylint_code = _run_pylint(venv_cmd=venv_cmd,
+                              build_information=build_information,
+                              pylint_log=report_paths['pylint_log'],
+                              pylint_dir=report_paths['pylint_dir'],
+                              project_root=project_root)
     python_layout_code = _run_python_layout(
         venv_cmd=venv_cmd, build_spec=build_spec,
         build_information=build_information,
@@ -130,5 +182,6 @@ def _run_linters(venv_cmd: list[str], build_information: BuildInformation,
     return {
         'mypy': mypy_code,
         'flake8': flake8_code,
+        'pylint': pylint_code,
         'python_layout': python_layout_code
     }

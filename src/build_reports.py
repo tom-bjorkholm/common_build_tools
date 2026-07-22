@@ -23,6 +23,7 @@ MYPY_LOG_NAME = 'mypy_errors.txt'
 PYTHON_LAYOUT_LOG_NAME = 'python_layout_log.txt'
 FLAKE_DIR_NAME = 'flake_report'
 MYPY_DIR_NAME = 'mypy_report'
+PYLINT_DIR_NAME = 'pylint_report'
 
 REPORT_LINKS = [
     ('pytest_report.html?visible=failed,error,xfailed,xpassed,rerun',
@@ -32,6 +33,7 @@ REPORT_LINKS = [
     ('mypy_report/index.html', 'mypy report'),
     ('mypy_errors.txt', 'mypy errors'),
     ('python_layout_log.txt', 'python layout log'),
+    ('pylint_report/index.html', 'pylint report'),
     ('pylint_log.txt', 'pylint log'),
     ('build_log.txt', 'build log'),
     ('pytest_log.txt', 'pytest log')
@@ -45,6 +47,7 @@ class ReportSummary(NamedTuple):
     test_summary: str
     flake8_clean: Optional[bool]
     mypy_clean: Optional[bool]
+    pylint_clean: Optional[bool]
     python_layout_clean: Optional[bool]
     python_version: str
     build_failed: bool
@@ -123,6 +126,16 @@ def _check_mypy_clean(report_paths: dict[str, Path]) -> Optional[bool]:
     return 'Success: no issues found' in content
 
 
+def _check_pylint_clean(report_paths: dict[str, Path]) -> Optional[bool]:
+    """Return pylint status, or None if no pylint log was generated."""
+    if not report_paths['pylint_log'].exists():
+        return None
+    content = report_paths['pylint_log'].read_text(encoding='utf-8')
+    if 'No pylint targets discovered.' in content:
+        return None
+    return 'rated at 10.00/10' in content
+
+
 def _check_python_layout_clean(
         report_paths: dict[str, Path]) -> Optional[bool]:
     """Return python-layout status, or None if log was not generated."""
@@ -161,6 +174,15 @@ def _mypy_summary_text(mypy_clean: Optional[bool]) -> str:
     return 'mypy report not available.'
 
 
+def _pylint_summary_text(pylint_clean: Optional[bool]) -> str:
+    """Return display text for the pylint summary."""
+    if pylint_clean is True:
+        return 'No pylint warnings.'
+    if pylint_clean is False:
+        return 'Pylint warnings.'
+    return 'Pylint report not available.'
+
+
 def _python_layout_summary_text(python_layout_clean: Optional[bool]) -> str:
     """Return display text for the python-layout summary."""
     if python_layout_clean is True:
@@ -188,6 +210,9 @@ def _build_failure_messages(report_context: ReportGenerationContext,
     mypy_code = report_context.build_run_status.lint_codes.get('mypy')
     if mypy_code not in (None, 0):
         failure_messages.append('mypy reported errors.')
+    pylint_code = report_context.build_run_status.lint_codes.get('pylint')
+    if pylint_code not in (None, 0):
+        failure_messages.append('pylint reported issues.')
     layout_code = report_context.build_run_status.lint_codes.get(
         'python_layout')
     if layout_code not in (None, 0):
@@ -204,25 +229,30 @@ def _report_path_from_href(report_dir: Path, href: str) -> Path:
     return report_dir / href.split('?', maxsplit=1)[0]
 
 
+def _href_failed_earlier(href: str, build_run_status: BuildRunStatus) -> bool:
+    """Return True when href is missing because an earlier step failed."""
+    lint_groups = {
+        'mypy': ('mypy_report/index.html', 'mypy_errors.txt'),
+        'flake8': ('flake_report/index.html', 'flake8_log.txt'),
+        'python_layout': ('python_layout_log.txt',),
+        'pylint': ('pylint_report/index.html', 'pylint_log.txt')
+    }
+    for tool, hrefs in lint_groups.items():
+        if href in hrefs:
+            return build_run_status.lint_codes.get(tool) is None
+    if (href.startswith('pytest_report.html') or
+            href in ('coverage/index.html', 'pytest_log.txt')):
+        return build_run_status.pytest_code is None
+    return False
+
+
 def _missing_report_message(href: str, build_run_status: BuildRunStatus,
                             build_failed: bool) -> str:
     """Return explanation text for one missing report link."""
     if not build_failed:
         return 'not generated'
-    if href in ('mypy_report/index.html', 'mypy_errors.txt'):
-        if build_run_status.lint_codes.get('mypy') is None:
-            return 'not generated because build failed earlier'
-    if href in ('flake_report/index.html', 'flake8_log.txt'):
-        if build_run_status.lint_codes.get('flake8') is None:
-            return 'not generated because build failed earlier'
-    if href == 'python_layout_log.txt':
-        if build_run_status.lint_codes.get('python_layout') is None:
-            return 'not generated because build failed earlier'
-    if (href.startswith('pytest_report.html') or
-            href in ('coverage/index.html', 'pylint_log.txt',
-                     'pytest_log.txt')):
-        if build_run_status.pytest_code is None:
-            return 'not generated because build failed earlier'
+    if _href_failed_earlier(href, build_run_status):
+        return 'not generated because build failed earlier'
     return 'not generated'
 
 
@@ -337,6 +367,10 @@ def _write_html_report(build_information: BuildInformation,
             '</p>\n')
         file_obj.write(
             '<p>'
+            f'{html.escape(_pylint_summary_text(report_summary.pylint_clean))}'
+            '</p>\n')
+        file_obj.write(
+            '<p>'
             f'{html.escape(layout_text)}'
             '</p>\n')
         if report_summary.repo_sync_warnings:
@@ -378,6 +412,8 @@ def _write_test_summary(report_paths: dict[str, Path],
         file_obj.write(
             f'- {_flake8_summary_text(report_summary.flake8_clean)}\n')
         file_obj.write(f'- {_mypy_summary_text(report_summary.mypy_clean)}\n')
+        file_obj.write(
+            f'- {_pylint_summary_text(report_summary.pylint_clean)}\n')
         file_obj.write(f'- {layout_text}\n')
         file_obj.write(f'- Built version(s): {report_summary.version_text}\n')
         file_obj.write(
@@ -393,6 +429,7 @@ def _generate_reports(report_context: ReportGenerationContext) -> int:
         report_context.report_paths['pytest_log'])
     flake8_clean = _check_flake8_clean(report_context.report_paths)
     mypy_clean = _check_mypy_clean(report_context.report_paths)
+    pylint_clean = _check_pylint_clean(report_context.report_paths)
     python_layout_clean = _check_python_layout_clean(
         report_context.report_paths)
     version_text = _build_version_text(report_context.build_information)
@@ -405,8 +442,9 @@ def _generate_reports(report_context: ReportGenerationContext) -> int:
     report_summary = ReportSummary(
         version_text=version_text, test_summary=pytest_summary,
         flake8_clean=flake8_clean, mypy_clean=mypy_clean,
-        python_layout_clean=python_layout_clean, python_version=python_version,
-        build_failed=build_failed, failure_messages=failure_messages,
+        pylint_clean=pylint_clean, python_layout_clean=python_layout_clean,
+        python_version=python_version, build_failed=build_failed,
+        failure_messages=failure_messages,
         missing_report_messages=_missing_report_messages(
             report_paths=report_context.report_paths,
             build_run_status=report_context.build_run_status,

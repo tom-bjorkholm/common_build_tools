@@ -52,8 +52,8 @@ class BuildSpec(NamedTuple):
     7. Run `custom_before_install` hooks.
     8. Install built wheel packages in dependency order.
     9. Run `custom_before_test` hooks.
-    10. Run flake8, mypy and python-layout on discovered folders.
-    11. Run pytest on discovered test and pylint folders.
+    10. Run flake8, mypy, pylint and python-layout on discovered folders.
+    11. Run pytest on discovered test folders.
     12. Run `custom_after_test` hooks.
     13. Run pydoc-markdown for
         `custom_build_tools/pydoc-markdown*.yml` in project root.

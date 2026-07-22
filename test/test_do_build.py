@@ -23,8 +23,10 @@ def _report_paths(report_dir: Path, dist_dir: Path) -> dict[str, Path]:
     """Create report path mapping used by do_build internal helpers."""
     flake_dir = report_dir / build_reports.FLAKE_DIR_NAME
     mypy_dir = report_dir / build_reports.MYPY_DIR_NAME
+    pylint_dir = report_dir / build_reports.PYLINT_DIR_NAME
     flake_dir.mkdir(parents=True, exist_ok=True)
     mypy_dir.mkdir(parents=True, exist_ok=True)
+    pylint_dir.mkdir(parents=True, exist_ok=True)
     return {
         'report_dir': report_dir,
         'dist_dir': dist_dir,
@@ -36,16 +38,19 @@ def _report_paths(report_dir: Path, dist_dir: Path) -> dict[str, Path]:
         'python_layout_log': (
             report_dir / build_reports.PYTHON_LAYOUT_LOG_NAME),
         'flake_dir': flake_dir,
-        'mypy_dir': mypy_dir
+        'mypy_dir': mypy_dir,
+        'pylint_dir': pylint_dir
     }
 
 
 def _write_clean_lint_reports(report_paths: dict[str, Path]) -> None:
-    """Write clean mypy, flake8 and python-layout report files."""
+    """Write clean mypy, flake8, pylint and python-layout report files."""
     report_paths['mypy_log'].write_text('Success: no issues found\n',
                                         encoding='utf-8')
     (report_paths['flake_dir'] / 'index.html').write_text(
         'No flake8 errors found', encoding='utf-8')
+    report_paths['pylint_log'].write_text(
+        'Your code has been rated at 10.00/10\n', encoding='utf-8')
     report_paths['python_layout_log'].write_text(
         'No python layout issues found.\n'
         '\n'
@@ -66,6 +71,7 @@ def _report_context(build_information: BuildInformation,
     resolved_lint_codes: dict[str, Optional[int]] = {
         'mypy': 0,
         'flake8': 0,
+        'pylint': 0,
         'python_layout': 0,
     }
     if lint_codes is not None:
@@ -123,8 +129,8 @@ def test_pytest_folders_dedupe(tmp_path: Path) -> None:
     folder_b = tmp_path / 'b'
     info = BuildInformation(project_root=tmp_path, package_information=[],
                             package_install_order=[], flake8_folders=[],
-                            pylint_folders=[folder_a, folder_b],
-                            mypy_folders=[], pytest_folders=[folder_a],
+                            pylint_folders=[tmp_path / 'src'], mypy_folders=[],
+                            pytest_folders=[folder_a, folder_b, folder_a],
                             mypy_path_folders=[],)
     folders = do_build._pytest_collection_folders(info)
     assert folders == [folder_a, folder_b]
@@ -240,6 +246,102 @@ def test_python_layout_command_can_disable_name_guidance() -> None:
     assert '--name-guidance-fails' not in command
 
 
+def test_pylint_no_targets(tmp_path: Path) -> None:
+    """Test pylint step writes a status log when no folders exist."""
+    info = make_build_information(tmp_path)
+    pylint_log = tmp_path / 'pylint_log.txt'
+    pylint_dir = tmp_path / 'pylint_report'
+    pylint_dir.mkdir()
+    result = build_lint._run_pylint(venv_cmd=['python'],
+                                    build_information=info,
+                                    pylint_log=pylint_log,
+                                    pylint_dir=pylint_dir,
+                                    project_root=tmp_path)
+    assert result == 0
+    assert pylint_log.read_text(encoding='utf-8') == (
+        'No pylint targets discovered.\n')
+
+
+def test_pylint_command(tmp_path: Path) -> None:
+    """Test pylint command sets text/JSON output and folder targets."""
+    info = make_build_information(tmp_path)
+    info['pylint_folders'] = [tmp_path / 'src', tmp_path / 'test']
+    (tmp_path / '.pylintrc').write_text('', encoding='utf-8')
+    json_path = tmp_path / 'pylint.json'
+    command = build_lint._pylint_command(['venv/bin/python'], info, json_path,
+                                         tmp_path)
+    assert command[:3] == ['venv/bin/python', '-m', 'pylint']
+    assert '--recursive=y' in command
+    assert f'--output-format=text,json:{json_path}' in command
+    assert f'--rcfile={tmp_path / ".pylintrc"}' in command
+    assert str(tmp_path / 'src') in command
+    assert str(tmp_path / 'test') in command
+
+
+def test_pylint_run_html(monkeypatch: pytest.MonkeyPatch,
+                         tmp_path: Path) -> None:
+    """Test pylint step runs pylint then converts JSON to HTML."""
+    info = make_build_information(tmp_path)
+    info['pylint_folders'] = [tmp_path / 'src']
+    pylint_dir = tmp_path / 'pylint_report'
+    pylint_dir.mkdir()
+    pylint_log = tmp_path / 'pylint_log.txt'
+    calls: list[list[str]] = []
+
+    def _run_command_logged(command: list[str], log_file: Path, check: bool,
+                            cwd: Path) -> int:
+        _ = log_file
+        _ = check
+        _ = cwd
+        calls.append(command)
+        if '-m' in command:
+            (pylint_dir / 'pylint.json').write_text('[]', encoding='utf-8')
+        return 0
+
+    monkeypatch.setattr(build_lint, 'run_command_logged', _run_command_logged)
+    monkeypatch.setattr(build_lint, 'venv_script',
+                        lambda name: f'venv/bin/{name}')
+    result = build_lint._run_pylint(venv_cmd=['python'],
+                                    build_information=info,
+                                    pylint_log=pylint_log,
+                                    pylint_dir=pylint_dir,
+                                    project_root=tmp_path)
+    assert result == 0
+    assert len(calls) == 2
+    assert 'pylint' in calls[0]
+    assert 'venv/bin/pylint-json2html' in calls[1]
+
+
+@pytest.mark.parametrize('content, expected', [
+    ('Your code has been rated at 10.00/10\n', True),
+    ('file.py:1:0: C0114: msg\nrated at 9.50/10\n', False),
+    ('No pylint targets discovered.\n', None)
+])
+def test_check_pylint_clean(tmp_path: Path, content: str,
+                            expected: Optional[bool]) -> None:
+    """Test pylint clean detection from the pylint log content."""
+    pylint_log = tmp_path / 'pylint_log.txt'
+    pylint_log.write_text(content, encoding='utf-8')
+    assert build_reports._check_pylint_clean(
+        {'pylint_log': pylint_log}) is expected
+
+
+def test_pylint_no_log(tmp_path: Path) -> None:
+    """Test pylint clean detection returns None for a missing log."""
+    assert build_reports._check_pylint_clean(
+        {'pylint_log': tmp_path / 'missing.txt'}) is None
+
+
+@pytest.mark.parametrize('clean, expected', [
+    (True, 'No pylint warnings.'),
+    (False, 'Pylint warnings.'),
+    (None, 'Pylint report not available.')
+])
+def test_pylint_summary_text(clean: Optional[bool], expected: str) -> None:
+    """Test pylint summary text for each clean state."""
+    assert build_reports._pylint_summary_text(clean) == expected
+
+
 def test_pytest_cmd_flags(tmp_path: Path) -> None:
     """Test constructed pytest command includes report and coverage flags."""
     package_folder = tmp_path / 'pkg-one'
@@ -248,8 +350,6 @@ def test_pytest_cmd_flags(tmp_path: Path) -> None:
                                        name='pkg-one')
     info = make_build_information(tmp_path, [package])
     info['pytest_folders'] = [tmp_path / 'test']
-    info['pylint_folders'] = [tmp_path / 'src']
-    (tmp_path / '.pylintrc').write_text('[MAIN]\n', encoding='utf-8')
     report_dir = tmp_path / 'reports'
     report_dir.mkdir(parents=True, exist_ok=True)
     cov_config = do_build._write_cov_config(info, report_dir)
@@ -258,8 +358,7 @@ def test_pytest_cmd_flags(tmp_path: Path) -> None:
     command_text = ' '.join(command)
     assert command[:3] == ['venv/bin/python', '-m', 'pytest']
     assert '--self-contained-html' in command
-    assert '--pylint' in command
-    assert f'--pylint-rcfile={tmp_path / ".pylintrc"}' in command
+    assert '--pylint' not in command
     assert '--cov' in command
     assert cov_config is not None
     assert f'--cov-config={cov_config}' in command
@@ -391,7 +490,8 @@ def test_reports_error_on_lint(monkeypatch: pytest.MonkeyPatch,
     result = build_reports._generate_reports(
         report_context=_report_context(
             build_information=info, report_paths=paths,
-            lint_codes={'mypy': 1, 'flake8': 0, 'python_layout': 0}))
+            lint_codes={'mypy': 1, 'flake8': 0, 'pylint': 0,
+                        'python_layout': 0}))
     assert result == 1
 
 
@@ -412,7 +512,8 @@ def test_reports_python_layout_error(monkeypatch: pytest.MonkeyPatch,
     result = build_reports._generate_reports(
         report_context=_report_context(
             build_information=info, report_paths=paths,
-            lint_codes={'mypy': 0, 'flake8': 0, 'python_layout': 1}))
+            lint_codes={'mypy': 0, 'flake8': 0, 'pylint': 0,
+                        'python_layout': 1}))
     assert result == 1
     index_text = (report_dir / 'index.html').read_text(encoding='utf-8')
     assert 'python-layout reported warnings or failing guidance.' in index_text
@@ -522,6 +623,7 @@ def test_reports_failure_banner_and_missing_reports(
             lint_codes={
                 'mypy': None,
                 'flake8': None,
+                'pylint': None,
                 'python_layout': None
             }, pytest_code=None, pydoc_code=None,
             build_failure=build_reports.BuildFailure(
@@ -600,7 +702,7 @@ def test_do_build_runs_steps(monkeypatch: pytest.MonkeyPatch,
 
     def _run_linters(**_kwargs: object) -> dict[str, int]:
         events.append('linters')
-        return {'mypy': 0, 'flake8': 0, 'python_layout': 0}
+        return {'mypy': 0, 'flake8': 0, 'pylint': 0, 'python_layout': 0}
 
     def _run_pytest(**_kwargs: object) -> int:
         events.append('pytest')
@@ -705,6 +807,7 @@ def test_do_build_pydoc_error(monkeypatch: pytest.MonkeyPatch,
     monkeypatch.setattr(do_build, '_run_linters', lambda **_kwargs: {
         'mypy': 0,
         'flake8': 0,
+        'pylint': 0,
         'python_layout': 0,
     })
     monkeypatch.setattr(do_build, '_run_pytest', lambda **_kwargs: 0)
@@ -748,11 +851,13 @@ def test_do_build_writes_reports_on_post_install_exception(
                                             encoding='utf-8')
         (report_paths['flake_dir'] / 'index.html').write_text(
             'No flake8 errors found', encoding='utf-8')
+        report_paths['pylint_log'].write_text(
+            'Your code has been rated at 10.00/10\n', encoding='utf-8')
         report_paths['python_layout_log'].write_text(
             'No python layout issues found.\n'
             '\n'
             'No python-layout guidance messages.\n', encoding='utf-8')
-        return {'mypy': 0, 'flake8': 0, 'python_layout': 0}
+        return {'mypy': 0, 'flake8': 0, 'pylint': 0, 'python_layout': 0}
 
     def _run_pytest(**kwargs: object) -> int:
         pytest_log = kwargs['pytest_log']
@@ -765,8 +870,6 @@ def test_do_build_writes_reports_on_post_install_exception(
         (report_dir / 'coverage').mkdir(exist_ok=True)
         (report_dir / 'coverage' / 'index.html').write_text('coverage report',
                                                             encoding='utf-8')
-        (report_dir / build_reports.PYLINT_LOG_NAME).write_text(
-            'pylint report\n', encoding='utf-8')
         return 0
 
     def _raise_after_test(_spec: BuildSpec, _info: BuildInformation) -> None:

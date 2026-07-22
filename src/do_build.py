@@ -21,6 +21,7 @@ from build_reports import (
     FLAKE_LOG_NAME,
     MYPY_DIR_NAME,
     MYPY_LOG_NAME,
+    PYLINT_DIR_NAME,
     PYLINT_LOG_NAME,
     PYTEST_LOG_NAME,
     PYTHON_LAYOUT_LOG_NAME,
@@ -64,7 +65,8 @@ def _run_custom_hooks(hooks: Optional[list[CustomFunction]],
 def _initial_build_run_status() -> BuildRunStatus:
     """Return build run status before lint, pytest and pydoc have run."""
     return BuildRunStatus(
-        lint_codes={'mypy': None, 'flake8': None, 'python_layout': None},
+        lint_codes={'mypy': None, 'flake8': None, 'pylint': None,
+                    'python_layout': None},
         pytest_code=None, pydoc_code=None)
 
 
@@ -116,6 +118,7 @@ def _prepare_directories(
         shutil.rmtree(package_folder / 'dist', ignore_errors=True)
     (report_dir / FLAKE_DIR_NAME).mkdir(parents=True, exist_ok=True)
     (report_dir / MYPY_DIR_NAME).mkdir(parents=True, exist_ok=True)
+    (report_dir / PYLINT_DIR_NAME).mkdir(parents=True, exist_ok=True)
     _clean_cache_folders(build_information)
     return {
         'report_dir': report_dir,
@@ -128,6 +131,7 @@ def _prepare_directories(
         'python_layout_log': report_dir / PYTHON_LAYOUT_LOG_NAME,
         'flake_dir': report_dir / FLAKE_DIR_NAME,
         'mypy_dir': report_dir / MYPY_DIR_NAME,
+        'pylint_dir': report_dir / PYLINT_DIR_NAME,
     }
 
 
@@ -211,14 +215,10 @@ def _install_packages(venv_cmd: list[str], build_information: BuildInformation,
 
 def _pytest_collection_folders(
         build_information: BuildInformation) -> list[Path]:
-    """Return pytest collection folders for tests and pylint targets."""
-    folders = (
-        build_information['pytest_folders'] +
-        build_information['pylint_folders']
-    )
+    """Return unique pytest collection folders for discovered tests."""
     unique_folders: list[Path] = []
     seen: set[Path] = set()
-    for folder in folders:
+    for folder in build_information['pytest_folders']:
         if folder in seen:
             continue
         seen.add(folder)
@@ -263,12 +263,7 @@ def _pytest_command(venv_cmd: list[str], build_information: BuildInformation,
         f'--html={report_dir / "pytest_report.html"}',
         '--self-contained-html',
         f'--cov-report=html:{report_dir / "coverage"}',
-        '--pylint',
-        f'--pylint-output-file={report_dir / PYLINT_LOG_NAME}',
     ])
-    pylint_rcfile = report_dir.parent / '.pylintrc'
-    if pylint_rcfile.is_file():
-        command.append(f'--pylint-rcfile={pylint_rcfile}')
     if cov_config is not None:
         command.extend(['--cov', f'--cov-config={cov_config}'])
     return command
@@ -279,14 +274,10 @@ def _run_pytest(venv_cmd: list[str], build_information: BuildInformation,
                 excluded_markers: list[str]) -> int:
     """Run pytest and return pytest exit code."""
     # pylint: disable=too-many-arguments,too-many-positional-arguments
-    pylint_log = report_dir / PYLINT_LOG_NAME
     if not _pytest_collection_folders(build_information):
         pytest_log.write_text('No pytest targets discovered.\n',
                               encoding='utf-8')
-        pylint_log.write_text('No pylint targets discovered.\n',
-                              encoding='utf-8')
         return 0
-    pylint_log.touch(exist_ok=True)
     cov_config = _write_cov_config(build_information, report_dir)
     return run_command_logged(
         _pytest_command(venv_cmd=venv_cmd, build_information=build_information,
@@ -437,7 +428,7 @@ def do_build(python_name: Optional[str] = None,
         current_phase = 'custom_before_test hooks'
         _run_custom_hooks(active_spec.custom_before_test, active_spec,
                           active_information)
-        current_phase = 'mypy, flake8 and python-layout'
+        current_phase = 'mypy, flake8, pylint and python-layout'
         lint_codes = _run_linters(venv_cmd=venv_cmd,
                                   build_information=active_information,
                                   report_paths=report_paths,

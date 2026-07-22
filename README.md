@@ -47,8 +47,9 @@ git submodule add -b master git@github.com:tom-bjorkholm/common_build_tools.git 
 These common build tools are designed to be shared between a few projects
 that share some specific requirements. These requirements are:
 
-- pytest, pylint (inside pytest with pytest-pylint), flake8, mypy and
-  python-layout are used to check the code.
+- pytest, pylint, flake8, mypy and python-layout are used to check the
+  code. flake8 and pylint are run as standalone build steps (not through
+  pytest plugins) so that the newest pytest can be used.
 
 - each project is building one or more .whl files. The .whl files are configured
   by either a `pyproject.toml` file, a `setup.py` file or both.
@@ -141,17 +142,18 @@ build flow are (from a user's point of view):
    If `custom_before_test` hooks are configured in the `BuildSpec` they
    are run.
 
-10. Run flake8, mypy and python-layout on discovered folders, with the
-    virtual environment (venv) active. (This means that imports from the
+10. Run flake8, mypy, pylint and python-layout on discovered folders, with
+    the virtual environment (venv) active. (This means that imports from the
     installed packages are working.) By default python-layout checks the
     same folders as flake8, but `python_layout_exclude_folders` can be used
-    for temporary rollout exclusions.
+    for temporary rollout exclusions. Pylint runs over all discovered
+    folders in a single invocation, so cross-file findings such as
+    duplicate-code (R0801) are detected. Pylint results are in
+    `./reports/pylint_log.txt` and `./reports/pylint_report/index.html`.
 
-11. Run pytest on discovered test and pylint folders, with the virtual
+11. Run pytest on discovered test folders, with the virtual
     environment (venv) active.
-    (This means that imports from the installed packages are working.
-    Pylint results are shown as `::PYLINT` test items in
-    `./reports/pytest_report.html`.)
+    (This means that imports from the installed packages are working.)
 
 12. Run `custom_after_test` hooks.
     If `custom_after_test` hooks are configured in the `BuildSpec` they
@@ -214,8 +216,7 @@ performed.
 
 #### Tests in build
 
-The "testing" includes flake8, mypy, python-layout and pytest with
-pytest-pylint.
+The "testing" includes flake8, mypy, pylint, python-layout and pytest.
 
 #### Coverage
 

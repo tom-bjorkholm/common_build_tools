@@ -53,10 +53,13 @@ def test_venv_install_list_sources() -> None:
     assert install_list[0] == 'pip'
     assert 'requests>=2.0' in install_list
     assert 'extra-package' in install_list
-    pinned = setup_build_environment.VENV_PINNED_PACKAGES
-    assert install_list[-len(pinned):] == pinned
-    assert 'pytest<9.1' in pinned
-    assert 'twine' in setup_build_environment.VENV_PACKAGES
+    packages = setup_build_environment.VENV_PACKAGES
+    assert not setup_build_environment.VENV_PINNED_PACKAGES
+    assert 'twine' in packages
+    assert 'pylint' in packages
+    assert 'pylint-json2html' in packages
+    assert 'pytest-flake8' not in packages
+    assert 'pytest-pylint' not in packages
 
 
 def test_setup_env_runs_steps(monkeypatch: pytest.MonkeyPatch) -> None:

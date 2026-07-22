@@ -31,27 +31,28 @@ VENV_PACKAGES = [
     'setuptools',
     'wheel',
     'twine',
+    'pytest',
     'pytest-html',
     'pytest-cov',
     'flake8',
     'flake8-html',
     'pylint',
+    'pylint-json2html',
     'mypy',
     'coverage',
     'pydoc-markdown',
     'lxml',
     'gitpython',
-    'pytest-flake8',
-    'pytest-pylint',
     'pytest-skip-slow',
     'flake8-docstrings',
     'readme_renderer[md]'
 ]
 
-# pytest is pinned below 9.1 because pytest 9.1 removed the 'path'
-# parameter from the pytest_collect_file hookspec, which breaks the
-# pytest-flake8 plugin with a PluginValidationError at startup.
-VENV_PINNED_PACKAGES = ['pytest<9.1']
+# flake8 and pylint are run as standalone build steps (see build_lint.py),
+# not through pytest plugins, so pytest is not pinned. This avoids the
+# pytest-flake8 and pytest-pylint plugins, whose pytest_collect_file hook
+# still uses the 'path' parameter removed in pytest 9.1.
+VENV_PINNED_PACKAGES: list[str] = []
 
 
 def _install_global_packages(python_cmd: list[str]) -> None:
