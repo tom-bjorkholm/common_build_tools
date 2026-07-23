@@ -82,6 +82,21 @@ def _mypy_env(build_info: BuildInformation) -> dict[str, str]:
     return environment
 
 
+def _pylint_env(build_info: BuildInformation) -> dict[str, str]:
+    """Return environment with PYTHONPATH set so pylint resolves imports.
+
+    Reuses `mypy_path_folders` so pylint can resolve imports of sibling
+    `src` folders (such as `custom_build_tools/src`) that pylint's own
+    path inference misses whenever both a `src` and a `test` folder
+    contain an `__init__.py`.
+    """
+    environment = dict(os.environ)
+    environment['PYTHONPATH'] = append_to_path_env(
+        existing_path=environment.get('PYTHONPATH'),
+        additional_paths=build_info['mypy_path_folders'])
+    return environment
+
+
 def _mypy_command(python_cmd: list[str], files: list[Path]) -> list[str]:
     """Return mypy strict command matching build checking settings."""
     return [*python_cmd, '-m', 'mypy', '--strict',
@@ -130,7 +145,7 @@ def _run_checks(python_cmd: list[str], build_spec: BuildSpec,
     flake8_code = _run(_flake8_command(python_cmd, files), project_root)
     layout_code = _run_layout(python_cmd, build_spec, files, project_root)
     pylint_code = _run(_pylint_command(python_cmd, files, project_root),
-                       project_root)
+                       project_root, _pylint_env(build_info))
     return {'mypy': mypy_code, 'flake8': flake8_code,
             'python-layout': layout_code, 'pylint': pylint_code}
 

@@ -283,17 +283,21 @@ def test_pylint_run_html(monkeypatch: pytest.MonkeyPatch,
     """Test pylint step runs pylint then converts JSON to HTML."""
     info = make_build_information(tmp_path)
     info['pylint_folders'] = [tmp_path / 'src']
+    info['mypy_path_folders'] = [tmp_path / 'extra_src']
     pylint_dir = tmp_path / 'pylint_report'
     pylint_dir.mkdir()
     pylint_log = tmp_path / 'pylint_log.txt'
     calls: list[list[str]] = []
+    envs: list[Optional[dict[str, str]]] = []
 
     def _run_command_logged(command: list[str], log_file: Path, check: bool,
-                            cwd: Path) -> int:
+                            cwd: Path,
+                            env: Optional[dict[str, str]] = None) -> int:
         _ = log_file
         _ = check
         _ = cwd
         calls.append(command)
+        envs.append(env)
         if '-m' in command:
             (pylint_dir / 'pylint.json').write_text('[]', encoding='utf-8')
         return 0
@@ -310,6 +314,9 @@ def test_pylint_run_html(monkeypatch: pytest.MonkeyPatch,
     assert len(calls) == 2
     assert 'pylint' in calls[0]
     assert 'venv/bin/pylint-json2html' in calls[1]
+    pylint_env = envs[0]
+    assert pylint_env is not None
+    assert str(tmp_path / 'extra_src') in pylint_env['PYTHONPATH']
 
 
 @pytest.mark.parametrize('content, expected', [

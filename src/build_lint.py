@@ -12,16 +12,24 @@ from build_utils import (append_to_path_env, run_command_logged,
                          venv_script)
 
 
+def _env_with_path_var(var_name: str,
+                       additional_paths: list[Path]) -> dict[str, str]:
+    """Return a copy of the environment with var_name path list extended."""
+    environment = dict(os.environ)
+    environment[var_name] = append_to_path_env(
+        existing_path=environment.get(var_name),
+        additional_paths=additional_paths)
+    return environment
+
+
 def _run_mypy(venv_cmd: list[str], build_information: BuildInformation,
               mypy_log: Path, mypy_dir: Path, project_root: Path) -> int:
     """Run mypy in strict mode on discovered folders."""
     if not build_information['mypy_folders']:
         mypy_log.write_text('No mypy targets discovered.\n', encoding='utf-8')
         return 0
-    environment = dict(os.environ)
-    environment['MYPYPATH'] = append_to_path_env(
-        existing_path=environment.get('MYPYPATH'),
-        additional_paths=build_information['mypy_path_folders'])
+    environment = _env_with_path_var('MYPYPATH',
+                                     build_information['mypy_path_folders'])
     return run_command_logged([*venv_cmd, '-m', 'mypy', '--strict',
                                '--explicit-package-bases', '--html-report',
                                str(mypy_dir),
@@ -141,15 +149,24 @@ def _write_pylint_html(json_path: Path, pylint_dir: Path,
 
 def _run_pylint(venv_cmd: list[str], build_information: BuildInformation,
                 pylint_log: Path, pylint_dir: Path, project_root: Path) -> int:
-    """Run pylint on discovered folders and build an HTML report."""
+    """Run pylint on discovered folders and build an HTML report.
+
+    PYTHONPATH is extended with `mypy_path_folders` so that pylint can
+    resolve imports of sibling `src` folders (such as
+    `custom_build_tools/src`) that pylint's own path inference would
+    otherwise miss whenever both a `src` and a `test` folder contain an
+    `__init__.py`.
+    """
     if not build_information['pylint_folders']:
         pylint_log.write_text('No pylint targets discovered.\n',
                               encoding='utf-8')
         return 0
     json_path = pylint_dir / 'pylint.json'
+    environment = _env_with_path_var('PYTHONPATH',
+                                     build_information['mypy_path_folders'])
     exit_code = run_command_logged(
         _pylint_command(venv_cmd, build_information, json_path, project_root),
-        log_file=pylint_log, check=False, cwd=project_root)
+        log_file=pylint_log, check=False, cwd=project_root, env=environment)
     _write_pylint_html(json_path=json_path, pylint_dir=pylint_dir,
                        project_root=project_root)
     return exit_code
