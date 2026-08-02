@@ -21,23 +21,35 @@ def resolve_python_command(python_name: str) -> list[str]:
     return _try_py_launcher(python_name)
 
 
+def run_py_launcher(args: list[str]) -> Optional[str]:
+    """Return stdout of the Windows py launcher, or None on any failure.
+
+    Returns None when the launcher is missing, times out or exits with a
+    non-zero code, so that callers only have to handle one failure value.
+    """
+    if not shutil.which('py'):
+        return None
+    try:
+        process = subprocess.run(['py', *args], capture_output=True, text=True,
+                                 timeout=10, check=False)
+    except subprocess.TimeoutExpired:
+        return None
+    if process.returncode != 0:
+        return None
+    return process.stdout
+
+
 def _try_py_launcher(python_name: str) -> list[str]:
     """Try to resolve python_name via the Windows py launcher."""
-    if not is_windows() or not shutil.which('py'):
+    if not is_windows():
         return []
     match = re.match(r'python(\d+\.\d+)', python_name)
     if not match:
         return []
     flag = f'-{match.group(1)}'
-    try:
-        process = subprocess.run(['py', flag, '--version'],
-                                 capture_output=True, text=True, timeout=10,
-                                 check=False)
-    except subprocess.TimeoutExpired:
+    if run_py_launcher([flag, '--version']) is None:
         return []
-    if process.returncode == 0:
-        return ['py', flag]
-    return []
+    return ['py', flag]
 
 
 def venv_python(venv_dir: str = 'venv') -> list[str]:

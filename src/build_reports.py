@@ -262,7 +262,7 @@ def _missing_report_messages(report_paths: dict[str, Path],
     """Return missing-report explanations keyed by link target."""
     missing_messages: dict[str, str] = {}
     report_dir = report_paths['report_dir']
-    for href, _text in REPORT_LINKS:
+    for href, _ in REPORT_LINKS:
         if _report_path_from_href(report_dir=report_dir, href=href).exists():
             continue
         missing_messages[href] = _missing_report_message(

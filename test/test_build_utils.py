@@ -9,6 +9,7 @@ from pathlib import Path
 import platform
 import shutil
 import subprocess
+from typing import Optional
 import pytest
 
 import build_utils
@@ -55,6 +56,21 @@ def test_py_launcher_timeout(monkeypatch: pytest.MonkeyPatch) -> None:
 
     monkeypatch.setattr(subprocess, 'run', _raise_timeout)
     assert not build_utils._try_py_launcher('python3.14')
+
+
+@pytest.mark.parametrize('which_result, code, expected',
+                         [(None, 0, None), ('/usr/bin/py', 3, None),
+                          ('/usr/bin/py', 0, 'out')])
+def test_run_py_launcher(monkeypatch: pytest.MonkeyPatch,
+                         which_result: Optional[str], code: int,
+                         expected: Optional[str]) -> None:
+    """Test run_py_launcher maps every failure to None and success to text."""
+    monkeypatch.setattr(shutil, 'which', lambda _name: which_result)
+    completed = subprocess.CompletedProcess(args=['py', '--list'],
+                                            returncode=code, stdout='out',
+                                            stderr='')
+    monkeypatch.setattr(subprocess, 'run', lambda *_a, **_k: completed)
+    assert build_utils.run_py_launcher(['--list']) == expected
 
 
 @pytest.mark.parametrize('windows_flag, expected_path', [

@@ -172,7 +172,7 @@ def test_skips_move_for_multi_line() -> None:
     assert _rules(source) == []
 
 
-def test_rejects_more_fits_after_first_line() -> None:
+def test_rejects_more_fits() -> None:
     """Test argument compaction is checked on later lines too."""
     source = (
         'result = func(argument_name_that_uses_most_of_the_line_but_still_'
@@ -192,7 +192,7 @@ def test_rejects_empty_close_call() -> None:
 @pytest.mark.parametrize('source', [
     'def func(\n        value: int) -> None:\n    pass\n',
     'class Example(\n        Base):\n    pass\n'])
-def test_rejects_definitions_and_class_bases(source: str) -> None:
+def test_rejects_definitions(source: str) -> None:
     """Test functions and class base lists use the same layout rules."""
     assert _rules(source) == [layout.RULE_EMPTY_OPEN]
 
@@ -223,13 +223,13 @@ def test_suppresses_all_rules() -> None:
     assert _rules(source) == []
 
 
-def test_ignores_parenthesized_tuple() -> None:
+def test_ignores_paren_tuple() -> None:
     """Test non-call parentheses are not checked."""
     source = 'value = (\n    1,\n    2)\n'
     assert _rules(source) == []
 
 
-def test_check_paths_reads_python_files(tmp_path: Path) -> None:
+def test_check_paths_reads(tmp_path: Path) -> None:
     """Test path checking recursively reads Python files."""
     package = tmp_path / 'pkg'
     package.mkdir()

@@ -81,6 +81,10 @@ class BuildSpec(NamedTuple):
     python_layout_name_guidance: bool = True
     """If True report long-name guidance for changed lines."""
 
+    # Public field of a shared build specification; renaming it to satisfy
+    # a machine local name length limit would break the repositories that
+    # already set it in their own custom_spec().
+    # pylint: disable-next=invalid-name
     python_layout_name_guidance_fails: bool = True
     """If True long-name guidance makes python-layout fail."""
 

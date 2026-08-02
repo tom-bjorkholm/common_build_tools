@@ -6,32 +6,25 @@
 
 import os
 import re
-import shutil
-import subprocess
 import sys
 from pathlib import Path
 
 from build_utils import (
     is_windows,
     resolve_python_command,
+    run_py_launcher,
     validate_python_name,
 )
 
 
 def _find_via_py_launcher() -> list[tuple[int, int]]:
     """Discover Python 3.x versions via the Windows py launcher."""
-    if not shutil.which('py'):
+    listing = run_py_launcher(['--list'])
+    if listing is None:
         return []
     results: list[tuple[int, int]] = []
     seen: set[tuple[int, int]] = set()
-    try:
-        process = subprocess.run(['py', '--list'], capture_output=True,
-                                 text=True, timeout=10, check=False)
-    except subprocess.TimeoutExpired:
-        return []
-    if process.returncode != 0:
-        return results
-    for line in process.stdout.splitlines():
+    for line in listing.splitlines():
         match = re.search(r'-(\d+)\.(\d+)', line)
         if not match:
             continue

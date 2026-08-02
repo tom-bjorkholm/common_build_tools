@@ -136,7 +136,7 @@ def test_pytest_folders_dedupe(tmp_path: Path) -> None:
     assert folders == [folder_a, folder_b]
 
 
-def test_python_layout_folders_use_flake8_by_default(tmp_path: Path) -> None:
+def test_layout_dir_flake8(tmp_path: Path) -> None:
     """Test python-layout checks the same folders as flake8 by default."""
     folder = tmp_path / 'src'
     info = make_build_information(tmp_path)
@@ -145,7 +145,7 @@ def test_python_layout_folders_use_flake8_by_default(tmp_path: Path) -> None:
     assert folders == [folder]
 
 
-def test_python_layout_folders_can_be_excluded(tmp_path: Path) -> None:
+def test_layout_dir_exclude(tmp_path: Path) -> None:
     """Test python-layout has its own folder exclusions."""
     included = tmp_path / 'included'
     excluded = tmp_path / 'excluded' / 'src'
@@ -172,7 +172,7 @@ def test_run_python_layout_disabled(tmp_path: Path) -> None:
     )
 
 
-def test_run_python_layout_no_targets(tmp_path: Path) -> None:
+def test_layout_no_targets(tmp_path: Path) -> None:
     """Test python-layout succeeds when no folders are discovered."""
     info = make_build_information(tmp_path)
     layout_log = tmp_path / 'python_layout_log.txt'
@@ -187,8 +187,8 @@ def test_run_python_layout_no_targets(tmp_path: Path) -> None:
     )
 
 
-def test_run_python_layout_uses_filtered_folders(
-        monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_layout_filtered(monkeypatch: pytest.MonkeyPatch,
+                         tmp_path: Path) -> None:
     """Test python-layout command receives flake8 folders after exclusions."""
     included = tmp_path / 'included'
     excluded = tmp_path / 'excluded' / 'src'
@@ -219,7 +219,7 @@ def test_run_python_layout_uses_filtered_folders(
     assert str(excluded) not in calls[0]
 
 
-def test_python_layout_command_uses_guidance_settings() -> None:
+def test_layout_cmd_guidance() -> None:
     """Test python-layout command includes configured guidance flags."""
     spec = BuildSpec(python_layout_name_guidance_fails=True,
                      python_layout_max_name_length=40)
@@ -235,7 +235,7 @@ def test_python_layout_command_uses_guidance_settings() -> None:
     ]
 
 
-def test_python_layout_command_can_disable_name_guidance() -> None:
+def test_layout_cmd_no_guide() -> None:
     """Test python-layout command can disable long-name guidance."""
     spec = BuildSpec(python_layout_name_guidance=False,
                      python_layout_name_guidance_fails=True)
@@ -502,8 +502,8 @@ def test_reports_error_on_lint(monkeypatch: pytest.MonkeyPatch,
     assert result == 1
 
 
-def test_reports_python_layout_error(monkeypatch: pytest.MonkeyPatch,
-                                     tmp_path: Path) -> None:
+def test_report_layout_error(monkeypatch: pytest.MonkeyPatch,
+                             tmp_path: Path) -> None:
     """Test report generation fails when python-layout fails."""
     info = make_build_information(tmp_path)
     report_dir = tmp_path / 'reports'
@@ -585,8 +585,8 @@ def test_reports_skip_limit(monkeypatch: pytest.MonkeyPatch,
     assert '## Test summary' not in package_readme.read_text(encoding='utf-8')
 
 
-def test_reports_skip_readmes_without_pytest_summary(
-        monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_report_skip_readmes(monkeypatch: pytest.MonkeyPatch,
+                             tmp_path: Path) -> None:
     """Test README summary update is skipped without a pytest summary."""
     package_folder = tmp_path / 'pkg-one'
     package_folder.mkdir(parents=True, exist_ok=True)
@@ -613,8 +613,8 @@ def test_reports_skip_readmes_without_pytest_summary(
     assert '## Test summary' not in package_readme.read_text(encoding='utf-8')
 
 
-def test_reports_failure_banner_and_missing_reports(
-        monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_report_failure(monkeypatch: pytest.MonkeyPatch,
+                        tmp_path: Path) -> None:
     """Test failure summary is visible and missing links explain why."""
     info = make_build_information(tmp_path)
     report_dir = tmp_path / 'reports'
@@ -836,8 +836,8 @@ def test_do_build_pydoc_error(monkeypatch: pytest.MonkeyPatch,
     assert report_contexts[0].build_failure is None
 
 
-def test_do_build_writes_reports_on_post_install_exception(
-        monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_build_report_on_exc(monkeypatch: pytest.MonkeyPatch,
+                             tmp_path: Path) -> None:
     """Test post-install exceptions still produce reports/index.html."""
     info = make_build_information(tmp_path)
 
