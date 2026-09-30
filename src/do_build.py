@@ -437,7 +437,7 @@ def do_build(python_name: Optional[str] = None,
         build_run_status = BuildRunStatus(lint_codes=lint_codes,
                                           pytest_code=None, pydoc_code=None)
         current_phase = 'pytest'
-        excl_markers = active_spec.excluded_test_markers
+        excl_markers = active_spec.excluded_test_markers or []
         pytest_code = _run_pytest(venv_cmd=venv_cmd,
                                   build_information=active_information,
                                   pytest_log=report_paths['pytest_log'],

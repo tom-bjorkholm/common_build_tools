@@ -124,7 +124,7 @@ class BuildSpec(NamedTuple):
     pytest_additional_folders: Optional[list[Path]] = None
     """Additional folders to include in pytest run."""
 
-    excluded_test_markers: list[str] = []
+    excluded_test_markers: Optional[list[str]] = None
     """Pytest markers to exclude from the build test run.
 
     Tests decorated with any of these markers are deselected (not
