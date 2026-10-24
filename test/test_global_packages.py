@@ -28,8 +28,8 @@ def _set_mode(monkeypatch: pytest.MonkeyPatch, mode: Optional[str]) -> None:
 
 
 def _fake_pip(monkeypatch: pytest.MonkeyPatch,
-              pending: dict[str, list[tuple[str, str]]],
-              target: str = TARGET, returncode: int = 0) -> list[list[str]]:
+              pending: dict[str, list[tuple[str, str]]], target: str = TARGET,
+              returncode: int = 0) -> list[list[str]]:
     """Fake target lookup, pip dry-run and pip list; return their commands.
 
     Installed versions are always pip 26.0 and twine 5.1.1.
