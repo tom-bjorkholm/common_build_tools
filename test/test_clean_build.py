@@ -25,11 +25,12 @@ def test_clean_build_step_order(monkeypatch: pytest.MonkeyPatch,
     def _fake_clean(*_args: object, **_kwargs: object) -> None:
         events.append('clean')
 
-    def _fake_setup(*_args: object, **_kwargs: object) -> None:
+    def _fake_setup(*_args: object, **_kwargs: object) -> str:
         events.append('setup')
+        return 'setup output'
 
-    def _fake_do_build(*_args: object, **_kwargs: object) -> int:
-        events.append('build')
+    def _fake_do_build(*_args: object, **kwargs: object) -> int:
+        events.append(f'build:{kwargs["setup_log"]}')
         return 0
 
     monkeypatch.setattr(clean_build, 'clean', _fake_clean)
@@ -39,7 +40,8 @@ def test_clean_build_step_order(monkeypatch: pytest.MonkeyPatch,
                                      build_spec=BuildSpec(),
                                      build_information=info)
     assert result == 0
-    assert events == ['exit_check', 'clean', 'setup', 'build']
+    assert events == ['exit_check', 'clean', 'setup',
+                      'build:setup output']
 
 
 def test_clean_build_gets_spec_info(monkeypatch: pytest.MonkeyPatch,
@@ -56,7 +58,7 @@ def test_clean_build_gets_spec_info(monkeypatch: pytest.MonkeyPatch,
                         lambda _name: ('python3.14', ['python3.14']))
     monkeypatch.setattr(clean_build, 'clean', lambda **_kwargs: None)
     monkeypatch.setattr(clean_build, 'setup_build_environment',
-                        lambda **_kwargs: None)
+                        lambda **_kwargs: '')
     monkeypatch.setattr(clean_build, 'do_build', lambda **_kwargs: 0)
     assert clean_build.clean_build() == 0
 

@@ -12,6 +12,7 @@ import tomllib
 from typing import Optional, TypedDict
 
 from build_spec import BuildInformation, BuildSpec, PackageInformation
+from build_utils import normalize_package_name, requirement_name
 from get_build_spec import get_build_spec
 
 
@@ -41,11 +42,6 @@ class _PackageFileData(TypedDict):
 def _project_root_from_tools() -> Path:
     """Return repository root from common_build_tools/src location."""
     return Path(__file__).resolve().parents[2]
-
-
-def _normalize_package_name(name: str) -> str:
-    """Normalize package names for dependency and lookup checks."""
-    return name.strip().lower().replace('-', '_')
 
 
 def _discover_package_folders(project_root: Path) -> list[Path]:
@@ -266,7 +262,7 @@ def _combine_package_data(
     src_folder = package_folder / 'src'
     test_folder = package_folder / 'test'
     return PackageInformation(
-        name=name_value, normalized_name=_normalize_package_name(name_value),
+        name=name_value, normalized_name=normalize_package_name(name_value),
         version=version_value,
         dependencies=[str(item) for item in dependencies_value],
         package_folder=package_folder, setup_file=setup_file,
@@ -301,14 +297,6 @@ def _version_key(version_text: str) -> tuple[tuple[int, object], ...]:
     return tuple(key_parts)
 
 
-def _extract_dependency_name(requirement: str) -> str:
-    """Extract normalized package name from a dependency requirement."""
-    match = re.match(r'^\s*([A-Za-z0-9_.-]+)', requirement)
-    if match is None:
-        return ''
-    return _normalize_package_name(match.group(1))
-
-
 def _extract_minimum_version(requirement: str) -> Optional[str]:
     """Extract largest minimum version specified with >= in requirement."""
     matches: list[str] = re.findall(r'>=\s*([A-Za-z0-9_.+\-]+)', requirement)
@@ -329,7 +317,7 @@ def _check_dep_versions(package_information: list[PackageInformation]) -> None:
     }
     for package_data in package_information:
         for requirement in package_data['dependencies']:
-            dep_name = _extract_dependency_name(requirement)
+            dep_name = requirement_name(requirement)
             if dep_name not in by_name:
                 continue
             required_package = by_name[dep_name]
@@ -381,7 +369,7 @@ def _dep_edges_for_packages(package_information: list[PackageInformation]) -> \
     for package_data in package_information:
         package_name = package_data['normalized_name']
         for requirement in package_data['dependencies']:
-            dep_name = _extract_dependency_name(requirement)
+            dep_name = requirement_name(requirement)
             if dep_name not in by_name:
                 continue
             graph[dep_name].append(package_name)
@@ -400,7 +388,7 @@ def _package_install_order(package_information: list[PackageInformation]) -> \
     for package_data in package_information:
         package_name = package_data['normalized_name']
         for requirement in package_data['dependencies']:
-            dep_name = _extract_dependency_name(requirement)
+            dep_name = requirement_name(requirement)
             if dep_name in indegree:
                 indegree[package_name] += 1
     ready_names = sorted(name for name, degree in indegree.items()

@@ -7,23 +7,21 @@
 import shutil
 import sys
 from pathlib import Path
-import re
 from typing import Optional
 
 from best_installed_python import resolve_target_python
 from build_information import get_build_information
 from build_spec import BuildInformation, BuildSpec
 from build_utils import (
+    clean_package_names,
     exit_if_in_virtualenv,
     extract_python_name,
+    requirement_name,
     run_command,
     venv_python,
 )
 from get_build_spec import get_build_spec
-
-GLOBAL_PACKAGES = ['pip', 'gitpython', 'twine']
-
-GLOBAL_PINNED_PACKAGES: list[str] = []
+from global_packages import install_global_packages
 
 VENV_PACKAGES = [
     'pip',
@@ -55,13 +53,6 @@ VENV_PACKAGES = [
 VENV_PINNED_PACKAGES: list[str] = []
 
 
-def _install_global_packages(python_cmd: list[str]) -> None:
-    """Install required global packages in selected system Python."""
-    for package_name in GLOBAL_PACKAGES + GLOBAL_PINNED_PACKAGES:
-        run_command([*python_cmd, '-m', 'pip', 'install', '--upgrade',
-                     package_name])
-
-
 def _create_or_recreate_venv(python_cmd: list[str],
                              force_recreate: bool = False) -> None:
     """Create venv if missing, optionally recreating existing environment."""
@@ -71,24 +62,9 @@ def _create_or_recreate_venv(python_cmd: list[str],
     if venv_path.exists():
         return
     run_command([*python_cmd, '-m', 'venv', 'venv'])
-    # upgrade pip to latest version so it can read pip cache
-    run_command([*python_cmd, '-m', 'pip', 'install', '--upgrade', 'pip',
+    # upgrade pip bundled with venv to latest version so it can read pip cache
+    run_command([*venv_python(), '-m', 'pip', 'install', '--upgrade', 'pip',
                  '--no-cache-dir'])
-    run_command([str(venv_path / 'bin' / 'python'), '-m', 'pip', 'install',
-                 '--upgrade', 'pip', '--no-cache-dir'])
-
-
-def _normalize_package_name(package_name: str) -> str:
-    """Normalize package name for package matching."""
-    return package_name.strip().lower().replace('-', '_')
-
-
-def _extract_dependency_name(requirement: str) -> Optional[str]:
-    """Extract package name from dependency requirement string."""
-    match = re.match(r'^\s*([A-Za-z0-9_.-]+)', requirement)
-    if match is None:
-        return None
-    return _normalize_package_name(match.group(1))
 
 
 def _dynamic_package_dependencies(
@@ -105,7 +81,7 @@ def _dynamic_package_dependencies(
     seen_requirements: set[str] = set()
     for package_info in build_information['package_information']:
         for requirement in package_info['dependencies']:
-            dep_name = _extract_dependency_name(requirement)
+            dep_name = requirement_name(requirement)
             if dep_name in internal_package_names:
                 continue
             requirement_text = requirement.strip()
@@ -120,13 +96,7 @@ def _dynamic_package_dependencies(
 
 def _additional_venv_packages(build_spec: BuildSpec) -> list[str]:
     """Return additional venv packages configured by build specification."""
-    if build_spec.additional_venv_packages is None:
-        return []
-    return [
-        package_name.strip()
-        for package_name in build_spec.additional_venv_packages
-        if package_name.strip()
-    ]
+    return clean_package_names(build_spec.additional_venv_packages)
 
 
 def _venv_install_list(build_spec: BuildSpec,
@@ -153,17 +123,21 @@ def setup_build_environment(python_name: str | None = None,
                             force_recreate: bool = False,
                             build_spec: Optional[BuildSpec] = None,
                             build_information: Optional[BuildInformation] =
-                            None) -> None:
-    """Set up build environment for selected Python version."""
+                            None) -> str:
+    """Set up build environment for selected Python version.
+
+    Returns the global package report and pip output for the build log.
+    """
     active_spec = get_build_spec() if build_spec is None else build_spec
     active_information = build_information
     if active_information is None:
         active_information = get_build_information(active_spec)
     exit_if_in_virtualenv('set up build environment')
     python_cmd = resolve_target_python(python_name)[1]
-    _install_global_packages(python_cmd)
+    setup_log = install_global_packages(python_cmd, active_spec)
     _create_or_recreate_venv(python_cmd, force_recreate=force_recreate)
     _install_venv_packages(active_spec, active_information)
+    return setup_log
 
 
 def setup_build_environment_cmd(build_spec: Optional[BuildSpec]

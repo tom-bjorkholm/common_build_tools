@@ -3,6 +3,7 @@
 # Copyright (c) 2024 - 2026 Tom Björkholm
 # MIT License
 
+import io
 import os
 import platform
 import re
@@ -10,7 +11,7 @@ import shutil
 import subprocess
 import sys
 from pathlib import Path
-from typing import Optional
+from typing import IO, Optional
 
 
 def resolve_python_command(python_name: str) -> list[str]:
@@ -94,18 +95,37 @@ def run_command_logged(cmd: list[str], log_file: Path, check: bool = True,
     return returncode
 
 
+def run_command_captured(cmd: list[str]) -> tuple[int, str]:
+    """Run a command, stream merged output to screen and return it.
+
+    The returned text starts with the printed command line, so that it can
+    be written to a log file that does not exist yet when the command runs.
+    """
+    command_line = f'+ {" ".join(cmd)}\n'
+    print(command_line, end='')
+    with io.StringIO() as sink:
+        returncode = _tee(cmd=cmd, sink=sink)
+        return returncode, command_line + sink.getvalue()
+
+
 def _tee_to_file(cmd: list[str], log_file: Path, mode: str,
                  cwd: Optional[Path] = None,
                  env: Optional[dict[str, str]] = None) -> int:
     """Run command and write merged output to stdout and log file."""
     with open(log_file, mode, encoding='utf-8') as log_file_obj:
-        with subprocess.Popen(cmd, stdout=subprocess.PIPE,
-                              stderr=subprocess.STDOUT, text=True, cwd=cwd,
-                              env=env) as process:
-            for line in (process.stdout or []):
-                sys.stdout.write(line)
-                sys.stdout.flush()
-                log_file_obj.write(line)
+        return _tee(cmd=cmd, sink=log_file_obj, cwd=cwd, env=env)
+
+
+def _tee(cmd: list[str], sink: IO[str], cwd: Optional[Path] = None,
+         env: Optional[dict[str, str]] = None) -> int:
+    """Run command and write merged output to stdout and sink."""
+    with subprocess.Popen(cmd, stdout=subprocess.PIPE,
+                          stderr=subprocess.STDOUT, text=True, cwd=cwd,
+                          env=env) as process:
+        for line in (process.stdout or []):
+            sys.stdout.write(line)
+            sys.stdout.flush()
+            sink.write(line)
     return process.returncode
 
 
@@ -176,6 +196,24 @@ def append_to_path_env(existing_path: Optional[str],
         seen_entries.add(add_text)
         merged_entries.append(add_text)
     return os.pathsep.join(merged_entries)
+
+
+def normalize_package_name(name: str) -> str:
+    """Normalize package names for dependency and lookup checks."""
+    return name.strip().lower().replace('-', '_')
+
+
+def requirement_name(requirement: str) -> str:
+    """Return normalized package name of a requirement, '' if none found."""
+    match = re.match(r'^\s*([A-Za-z0-9_.-]+)', requirement)
+    if match is None:
+        return ''
+    return normalize_package_name(match.group(1))
+
+
+def clean_package_names(names: Optional[list[str]]) -> list[str]:
+    """Return package names stripped, without empty ones (None gives [])."""
+    return [name.strip() for name in names or [] if name.strip()]
 
 
 def is_windows() -> bool:

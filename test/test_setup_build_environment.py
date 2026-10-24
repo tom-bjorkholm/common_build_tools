@@ -70,17 +70,22 @@ def test_setup_env_runs_steps(monkeypatch: pytest.MonkeyPatch) -> None:
                         lambda _action: events.append('exit_check'))
     monkeypatch.setattr(setup_build_environment, 'resolve_target_python',
                         lambda _python_name: ('python3.13', ['python3.13']))
-    monkeypatch.setattr(setup_build_environment, '_install_global_packages',
-                        lambda _cmd: events.append('install_global'))
+
+    def _install_global(_cmd: list[str], _spec: BuildSpec) -> str:
+        events.append('install_global')
+        return 'global log'
+
+    monkeypatch.setattr(setup_build_environment, 'install_global_packages',
+                        _install_global)
     monkeypatch.setattr(
         setup_build_environment, '_create_or_recreate_venv', lambda _cmd,
         force_recreate: events.append(f'create_venv:{force_recreate}'))
     monkeypatch.setattr(setup_build_environment, '_install_venv_packages',
                         lambda _spec, _info: events.append('install_venv'))
-    setup_build_environment.setup_build_environment(python_name='python3.13',
-                                                    force_recreate=True,
-                                                    build_spec=BuildSpec(),
-                                                    build_information=info)
+    setup_log = setup_build_environment.setup_build_environment(
+        python_name='python3.13', force_recreate=True, build_spec=BuildSpec(),
+        build_information=info)
+    assert setup_log == 'global log'
     assert events == [
         'exit_check',
         'install_global',
@@ -101,8 +106,8 @@ def test_setup_env_default_spec(monkeypatch: pytest.MonkeyPatch) -> None:
                         lambda _action: None)
     monkeypatch.setattr(setup_build_environment, 'resolve_target_python',
                         lambda _python_name: ('python3.14', ['python3.14']))
-    monkeypatch.setattr(setup_build_environment, '_install_global_packages',
-                        lambda _cmd: None)
+    monkeypatch.setattr(setup_build_environment, 'install_global_packages',
+                        lambda _cmd, _spec: '')
     monkeypatch.setattr(setup_build_environment, '_create_or_recreate_venv',
                         lambda _cmd, force_recreate: None)
     monkeypatch.setattr(setup_build_environment, '_install_venv_packages',
@@ -123,3 +128,19 @@ def test_setup_env_cmd_exits(monkeypatch: pytest.MonkeyPatch) -> None:
         setup_build_environment.setup_build_environment_cmd()
     assert called == ['python3.12:False']
     assert exc_info.value.code == 0
+
+
+def test_create_venv_commands(monkeypatch: pytest.MonkeyPatch,
+                              tmp_path: Path) -> None:
+    """Test new venv gets its pip upgraded, global pip is not touched."""
+    commands: list[list[str]] = []
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(setup_build_environment, 'venv_python',
+                        lambda: ['venv-python'])
+    monkeypatch.setattr(setup_build_environment, 'run_command',
+                        commands.append)
+    setup_build_environment._create_or_recreate_venv(['python3.13'])
+    assert commands == [
+        ['python3.13', '-m', 'venv', 'venv'],
+        ['venv-python', '-m', 'pip', 'install', '--upgrade', 'pip',
+         '--no-cache-dir']]

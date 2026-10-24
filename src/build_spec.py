@@ -153,3 +153,10 @@ class BuildSpec(NamedTuple):
 
     additional_venv_packages: Optional[list[str]] = None
     """Additional packages to install in the venv."""
+
+    additional_global_packages: Optional[list[str]] = None
+    """Additional packages to install in the global (non-venv) Python.
+
+    They are checked and installed like the default global packages,
+    controlled by environment variable CBT_GLOBAL_PIP.
+    """

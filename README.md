@@ -193,6 +193,57 @@ There are 3 entry point scripts (and 2 extra convenience scripts) for building t
   .whl file, and the `README_pypi.md` is packaged into the .whl file, this requires two consecutive
   runs of `clean_build.py`.
 
+#### Global packages and `CBT_GLOBAL_PIP`
+
+A few packages are needed outside the venv: `pip`, `gitpython` and `twine`,
+plus any packages listed in `BuildSpec.additional_global_packages`. When the
+build environment is set up (by `setup_build_environment.py`,
+`clean_build.py`, or `do_build.py` when `./venv` is missing) these packages
+are checked in two global Pythons: the target Python selected for the build
+and the Python running the build scripts (if it is a different one).
+
+The check is a `pip install --upgrade --dry-run --report` that lists what pip
+would install or upgrade (including dependencies and pinned versions). If
+nothing needs to change, nothing is installed. Otherwise the environment
+variable `CBT_GLOBAL_PIP` (case-insensitive) decides what happens:
+
+| `CBT_GLOBAL_PIP` | When packages need to change |
+| --- | --- |
+| unset, empty or `install` | `pip install --upgrade` into each outdated Python |
+| `force` | as `install`, with `--break-system-packages` |
+| `stop` | report the changes, explain how to fix, abort the build |
+| `skip` | report the changes, warn and continue without installing |
+
+Any other value aborts the build with an error message.
+
+On systems where the global Python is externally managed (PEP 668), for
+example Ubuntu, plain `pip install` outside a venv is refused. There you can
+install the packages yourself (the `stop` output shows the exact commands)
+and use `skip` or `stop`, or use `force` if you accept that pip modifies the
+system Python:
+
+````sh
+export CBT_GLOBAL_PIP=skip
+./run_clean_build.py
+````
+
+Requirements and behavior to be aware of:
+
+- The check needs pip version 22.2 or later in each global Python and
+  network access to the package index. If the check fails (for example no
+  global pip or no network) the build is aborted in all modes.
+
+- The report (installed version -> target version) and the output from any
+  global `pip install` are printed and also written to the start of
+  `./reports/build_log.txt`. A `do_build.py` run with an existing `./venv`
+  does not check global packages.
+
+- The check does not use the pip cache, and if pip itself needs an upgrade
+  it is upgraded first without the cache. This avoids an old pip reading a
+  cache written by a newer pip. The remaining packages are installed using
+  the cache. (If pip is pinned to an old version, that old pip will use the
+  cache.)
+
 #### Convenience wrapper scripts
 
 Names like `./common_build_tools/src/setup_build_environment.py` are a bit long to type.

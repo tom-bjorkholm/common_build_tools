@@ -9,6 +9,7 @@ from pathlib import Path
 import platform
 import shutil
 import subprocess
+import sys
 from typing import Optional
 import pytest
 
@@ -168,3 +169,31 @@ def test_is_windows_platform(monkeypatch: pytest.MonkeyPatch) -> None:
     assert build_utils.is_windows() is True
     monkeypatch.setattr(platform, 'system', lambda: 'Linux')
     assert build_utils.is_windows() is False
+
+
+@pytest.mark.parametrize('code, expected', [(0, 0), (6, 6)])
+def test_run_cmd_captured(capsys: pytest.CaptureFixture[str], code: int,
+                          expected: int) -> None:
+    """Test run_command_captured returns code and prints captured output."""
+    cmd = [sys.executable, '-c', f'print("hello"); raise SystemExit({code})']
+    returncode, text = build_utils.run_command_captured(cmd)
+    assert returncode == expected
+    assert text == f'+ {" ".join(cmd)}\nhello\n'
+    assert capsys.readouterr().out == text
+
+
+@pytest.mark.parametrize('names, expected', [
+    (None, []), ([], []), ([' a ', '', '  ', 'b'], ['a', 'b'])])
+def test_clean_package_names(names: Optional[list[str]],
+                             expected: list[str]) -> None:
+    """Test clean_package_names strips names and drops empty ones."""
+    assert build_utils.clean_package_names(names) == expected
+
+
+@pytest.mark.parametrize('requirement, expected', [
+    ('pip', 'pip'), (' Typing-Extensions>=4', 'typing_extensions'),
+    ('readme_renderer[md]', 'readme_renderer'), ('pip==26.0', 'pip'),
+    ('>=1.0', '')])
+def test_requirement_name(requirement: str, expected: str) -> None:
+    """Test requirement_name extracts normalized package name."""
+    assert build_utils.requirement_name(requirement) == expected

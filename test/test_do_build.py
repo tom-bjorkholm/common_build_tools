@@ -696,8 +696,9 @@ def test_do_build_runs_steps(monkeypatch: pytest.MonkeyPatch,
     monkeypatch.setattr(do_build, 'resolve_target_python',
                         lambda _python_name: ('python3.12', ['python3.12']))
 
-    def _ensure_venv(**_kwargs: object) -> None:
+    def _ensure_venv(**_kwargs: object) -> str:
         events.append('ensure_venv')
+        return 'setup output\n'
 
     def _build_packages(**_kwargs: object) -> int:
         events.append('build')
@@ -733,8 +734,10 @@ def test_do_build_runs_steps(monkeypatch: pytest.MonkeyPatch,
     monkeypatch.setattr(do_build, '_restore_line_end_only_changes', lambda: [])
     monkeypatch.setattr(do_build, '_generate_reports', _generate_reports)
     result = do_build.do_build(python_name='python3.12', build_spec=spec,
-                               build_information=info)
+                               build_information=info, setup_log='earlier\n')
     assert result == 0
+    build_log = tmp_path / 'reports' / build_reports.BUILD_LOG_NAME
+    assert 'earlier\nsetup output\n' in build_log.read_text(encoding='utf-8')
     assert events == [
         'ensure_venv',
         'before_clean',
@@ -776,7 +779,7 @@ def test_do_build_prints_sync_warns(
                         lambda _project_root: [warning_text])
     monkeypatch.setattr(do_build, 'resolve_target_python',
                         lambda _python_name: ('python3.14', ['python3.14']))
-    monkeypatch.setattr(do_build, '_ensure_venv', lambda **_kwargs: None)
+    monkeypatch.setattr(do_build, '_ensure_venv', lambda **_kwargs: '')
     monkeypatch.setattr(do_build, '_prepare_directories', _prepare)
     monkeypatch.setattr(do_build, '_build_packages', lambda **_kwargs: 2)
     monkeypatch.setattr(do_build, '_generate_reports',
@@ -807,7 +810,7 @@ def test_do_build_pydoc_error(monkeypatch: pytest.MonkeyPatch,
 
     monkeypatch.setattr(do_build, 'resolve_target_python',
                         lambda _python_name: ('python3.14', ['python3.14']))
-    monkeypatch.setattr(do_build, '_ensure_venv', lambda **_kwargs: None)
+    monkeypatch.setattr(do_build, '_ensure_venv', lambda **_kwargs: '')
     monkeypatch.setattr(do_build, '_prepare_directories', _prepare)
     monkeypatch.setattr(do_build, '_build_packages', lambda **_kwargs: 0)
     monkeypatch.setattr(do_build, '_install_packages', lambda **_kwargs: 0)
@@ -886,7 +889,7 @@ def test_build_report_on_exc(monkeypatch: pytest.MonkeyPatch,
                         lambda _python_name: ('python3.14', ['python3.14']))
     monkeypatch.setattr(build_reports, '_get_python_version',
                         lambda **_kwargs: 'Python')
-    monkeypatch.setattr(do_build, '_ensure_venv', lambda **_kwargs: None)
+    monkeypatch.setattr(do_build, '_ensure_venv', lambda **_kwargs: '')
     monkeypatch.setattr(do_build, '_prepare_directories', _prepare)
     monkeypatch.setattr(do_build, '_build_packages', lambda **_kwargs: 0)
     monkeypatch.setattr(do_build, '_install_packages', lambda **_kwargs: 0)
@@ -923,7 +926,7 @@ def test_do_build_logs_traceback(monkeypatch: pytest.MonkeyPatch,
 
     monkeypatch.setattr(do_build, 'resolve_target_python',
                         lambda _python_name: ('python3.14', ['python3.14']))
-    monkeypatch.setattr(do_build, '_ensure_venv', lambda **_kwargs: None)
+    monkeypatch.setattr(do_build, '_ensure_venv', lambda **_kwargs: '')
     monkeypatch.setattr(do_build, '_prepare_directories', _prepare)
     monkeypatch.setattr(do_build, '_build_packages', lambda **_kwargs: 0)
     monkeypatch.setattr(do_build, '_install_packages', _raise_install)

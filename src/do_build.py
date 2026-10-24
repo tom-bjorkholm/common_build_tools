@@ -72,14 +72,15 @@ def _initial_build_run_status() -> BuildRunStatus:
 
 def _ensure_venv(python_name: Optional[str], project_root: Path,
                  build_spec: BuildSpec,
-                 build_information: BuildInformation) -> None:
-    """Create build environment if venv is missing."""
+                 build_information: BuildInformation) -> str:
+    """Create build environment if venv is missing, return setup log text."""
     venv_cmd = venv_python()
     venv_path = project_root / venv_cmd[0]
     if venv_path.exists():
-        return
-    setup_build_environment(python_name=python_name, build_spec=build_spec,
-                            build_information=build_information)
+        return ''
+    return setup_build_environment(python_name=python_name,
+                                   build_spec=build_spec,
+                                   build_information=build_information)
 
 
 def _clean_cache_folders(build_information: BuildInformation) -> None:
@@ -364,8 +365,14 @@ def _generate_reports_after_failure(
 
 def do_build(python_name: Optional[str] = None,
              build_spec: Optional[BuildSpec] = None,
-             build_information: Optional[BuildInformation] = None) -> int:
-    """Run complete build process with reports and optional custom hooks."""
+             build_information: Optional[BuildInformation] = None,
+             setup_log: str = '') -> int:
+    """Run complete build process with reports and optional custom hooks.
+
+    setup_log is output from an earlier setup_build_environment call, that
+    is written to the build log together with output from any setup done
+    by this build.
+    """
     # pylint: disable=too-many-locals,too-many-statements
     active_spec = get_build_spec() if build_spec is None else build_spec
     active_information = build_information
@@ -383,9 +390,10 @@ def do_build(python_name: Optional[str] = None,
         current_phase = 'python selection'
         resolve_target_python(python_name)
         current_phase = 'virtual environment setup'
-        _ensure_venv(python_name=python_name, project_root=project_root,
-                     build_spec=active_spec,
-                     build_information=active_information)
+        setup_log += _ensure_venv(python_name=python_name,
+                                  project_root=project_root,
+                                  build_spec=active_spec,
+                                  build_information=active_information)
         venv_cmd = venv_python()
         current_phase = 'custom_before_clean hooks'
         _run_custom_hooks(active_spec.custom_before_clean, active_spec,
@@ -395,7 +403,8 @@ def do_build(python_name: Optional[str] = None,
             project_root=project_root, build_information=active_information)
         report_paths['build_log'].write_text(
             datetime.now().astimezone().strftime(
-                'Build started %Y-%m-%d %H:%M:%S %Z\n'), encoding='utf-8')
+                'Build started %Y-%m-%d %H:%M:%S %Z\n') + setup_log,
+            encoding='utf-8')
         current_phase = 'custom_before_build hooks'
         _run_custom_hooks(active_spec.custom_before_build, active_spec,
                           active_information)
