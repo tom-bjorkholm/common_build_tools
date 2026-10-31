@@ -449,6 +449,20 @@ def test_replace_summary_block(tmp_path: Path) -> None:
     assert 'new line' in content
 
 
+@pytest.mark.parametrize('newline', ['\n', '\r\n'])
+def test_replace_summary_lf(tmp_path: Path, newline: str) -> None:
+    """Test README with summary is written with LF line endings only."""
+    readme_path = tmp_path / 'README.md'
+    summary_path = tmp_path / 'summary.md'
+    readme_path.write_bytes(f'# Title{newline}## Test summary{newline}'
+                            .encode('utf-8'))
+    summary_path.write_bytes(b'## Test summary\n\nnew line\n')
+    build_reports._replace_test_summary_in_readme(readme_path=readme_path,
+                                                  summary_path=summary_path)
+    assert readme_path.read_bytes() == \
+        b'# Title\n## Test summary\n\nnew line\n'
+
+
 def test_reports_update_readmes(monkeypatch: pytest.MonkeyPatch,
                                 tmp_path: Path) -> None:
     """Test report generation writes outputs and updates README summaries."""

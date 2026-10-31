@@ -23,8 +23,8 @@ from typing import Optional
 from build_information import get_build_information
 from build_lint import _python_layout_command
 from build_spec import BuildInformation, BuildSpec
-from build_utils import (append_to_path_env, is_windows,
-                         resolve_python_command, run_command)
+from build_utils import (append_to_path_env, resolve_python_command,
+                         run_command, venv_python)
 from get_build_spec import get_build_spec
 
 
@@ -35,10 +35,7 @@ def _project_root() -> Path:
 
 def _venv_python_path() -> Path:
     """Return the expected venv python path for this platform."""
-    root = _project_root()
-    if is_windows():
-        return root / 'venv' / 'Scripts' / 'python.exe'
-    return root / 'venv' / 'bin' / 'python3'
+    return Path(venv_python(str(_project_root() / 'venv'))[0])
 
 
 def _python_from_path() -> list[str]:

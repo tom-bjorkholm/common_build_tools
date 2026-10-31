@@ -6,11 +6,11 @@
 # pylint: disable=protected-access
 
 from pathlib import Path
-import os
 import stat
 import pytest
 
 import create_wrappers
+from build_utils import is_windows
 from wrapper_file_list import WRAPPER_FILES
 
 
@@ -35,12 +35,12 @@ def test_custom_folders_keep_spec(tmp_path: Path) -> None:
     assert existing.read_text(encoding='utf-8') == 'ORIGINAL\n'
 
 
-def test_wrapper_perms_non_windows(monkeypatch: pytest.MonkeyPatch,
-                                   tmp_path: Path) -> None:
+@pytest.mark.skipif(is_windows(),
+                    reason='Windows has no POSIX executable permission bits')
+def test_wrapper_perms_posix(tmp_path: Path) -> None:
     """Test _set_wrapper_permissions sets executable bits on non-Windows."""
     wrapper_path = tmp_path / 'run_build.py'
     wrapper_path.write_text('print(1)\n', encoding='utf-8')
-    monkeypatch.setattr(os, 'name', 'posix')
     create_wrappers._set_wrapper_permissions(wrapper_path)
     mode = stat.S_IMODE(wrapper_path.stat().st_mode)
     assert mode == 0o755
@@ -50,13 +50,14 @@ def test_create_wrappers_files(monkeypatch: pytest.MonkeyPatch,
                                tmp_path: Path) -> None:
     """Test create_wrappers writes expected wrappers and custom folder tree."""
     monkeypatch.setattr(create_wrappers, '_project_root', lambda: tmp_path)
-    monkeypatch.setattr(os, 'name', 'nt')
+    monkeypatch.setattr(create_wrappers, 'is_windows', lambda: True)
     create_wrappers.create_wrappers()
     for wrapper_name, target_name in WRAPPER_FILES:
         wrapper_path = tmp_path / wrapper_name
         assert wrapper_path.exists()
         content = wrapper_path.read_text(encoding='utf-8')
         assert f'from {target_name} import {target_name}_cmd' in content
+        assert b'\r\n' not in wrapper_path.read_bytes()
     assert (tmp_path / 'custom_build_tools' / 'src').is_dir()
     assert (tmp_path / 'custom_build_tools' / 'test').is_dir()
     assert (tmp_path / 'custom_build_tools' / 'src' / '__init__.py').is_file()

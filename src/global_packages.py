@@ -22,6 +22,7 @@ from build_utils import (
     clean_package_names,
     requirement_name,
     run_command_captured,
+    utf8_child_env,
 )
 
 GLOBAL_PACKAGES = ['pip', 'gitpython', 'twine']
@@ -56,7 +57,9 @@ def _global_package_list(build_spec: BuildSpec) -> list[str]:
 
 def _checked_output(cmd: list[str]) -> str:
     """Return stdout of a check command, exit with a hint if it fails."""
-    result = subprocess.run(cmd, capture_output=True, text=True, check=False)
+    result = subprocess.run(cmd, capture_output=True, encoding='utf-8',
+                            errors='replace', check=False,
+                            env=utf8_child_env())
     if result.returncode == 0:
         return result.stdout
     print(result.stderr, end='', file=sys.stderr)

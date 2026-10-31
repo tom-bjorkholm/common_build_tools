@@ -6,6 +6,7 @@
 # pylint: disable=protected-access
 
 from pathlib import Path
+import os
 import shutil
 import stat
 import subprocess
@@ -57,7 +58,8 @@ def test_path_scan_finds_pythons(monkeypatch: pytest.MonkeyPatch,
     _create_executable(first_dir / 'python3.14')
     _create_executable(second_dir / 'python3.14')
     monkeypatch.setattr(best_installed_python, 'is_windows', lambda: False)
-    monkeypatch.setenv('PATH', f'{first_dir}:{second_dir}')
+    monkeypatch.setenv('PATH', os.pathsep.join([str(first_dir),
+                                                str(second_dir)]))
     versions = best_installed_python._find_via_path_scan()
     assert versions == [(3, 12), (3, 14)]
 

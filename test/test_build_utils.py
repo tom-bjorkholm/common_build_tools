@@ -6,6 +6,7 @@
 # pylint: disable=protected-access
 
 from pathlib import Path
+import os
 import platform
 import shutil
 import subprocess
@@ -82,7 +83,7 @@ def test_venv_python_path(monkeypatch: pytest.MonkeyPatch, windows_flag: bool,
                           expected_path: str) -> None:
     """Test venv_python path selection on Windows and non-Windows."""
     monkeypatch.setattr(build_utils, 'is_windows', lambda: windows_flag)
-    assert build_utils.venv_python() == [expected_path]
+    assert build_utils.venv_python() == [str(Path(expected_path))]
 
 
 @pytest.mark.parametrize('windows_flag, expected_path', [
@@ -93,7 +94,7 @@ def test_venv_script_path(monkeypatch: pytest.MonkeyPatch, windows_flag: bool,
                           expected_path: str) -> None:
     """Test venv_script returns expected script path for platform."""
     monkeypatch.setattr(build_utils, 'is_windows', lambda: windows_flag)
-    assert build_utils.venv_script('twine') == expected_path
+    assert build_utils.venv_script('twine') == str(Path(expected_path))
 
 
 def test_run_cmd_non_zero(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -158,9 +159,31 @@ def test_get_version_first_line(tmp_path: Path) -> \
 
 def test_append_path_env_order() -> None:
     """Test append_to_path_env appends unique entries in order."""
-    existing = '/a:/b:/a'
-    added = [Path('/b'), Path('/c')]
-    assert build_utils.append_to_path_env(existing, added) == '/a:/b:/c'
+    a_dir, b_dir, c_dir = (str(Path(name)) for name in ('/a', '/b', '/c'))
+    existing = os.pathsep.join([a_dir, b_dir, a_dir])
+    added = [Path(b_dir), Path(c_dir)]
+    assert build_utils.append_to_path_env(existing, added) == \
+        os.pathsep.join([a_dir, b_dir, c_dir])
+
+
+@pytest.mark.parametrize('env', [None, {'KEEP': 'x'}])
+def test_utf8_child_env(env: Optional[dict[str, str]]) -> None:
+    """Test utf8_child_env copies env and forces UTF-8 Python stdio."""
+    original = None if env is None else dict(env)
+    result = build_utils.utf8_child_env(env)
+    assert result['PYTHONIOENCODING'] == 'utf-8'
+    expected_keys = os.environ.keys() if env is None else env.keys()
+    assert set(expected_keys) <= set(result)
+    assert env == original
+
+
+def test_captured_non_ascii() -> None:
+    """Test captured child output with non-ASCII text decodes correctly."""
+    text = 'Bj\u00f6rkholm \u0141 \u2192'
+    returncode, output = build_utils.run_command_captured(
+        [sys.executable, '-c', f'print({text!r})'])
+    assert returncode == 0
+    assert output.endswith(f'{text}\n')
 
 
 def test_is_windows_platform(monkeypatch: pytest.MonkeyPatch) -> None:

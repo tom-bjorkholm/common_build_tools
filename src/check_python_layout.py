@@ -649,7 +649,7 @@ def changed_lines_from_diff(diff_text: str) -> dict[Path, set[int]]:
 def _git_output(args: list[str], project_root: Path) -> Optional[str]:
     """Return git command output, or None when git command fails."""
     process = subprocess.run(args, cwd=project_root, capture_output=True,
-                             text=True, check=False)
+                             encoding='utf-8', errors='replace', check=False)
     if process.returncode != 0:
         return None
     return process.stdout

@@ -3,11 +3,13 @@
 
 # Copyright (c) 2026 Tom Björkholm
 # MIT License
+# pylint: disable=protected-access
 
 from pathlib import Path
 import subprocess
 import sys
 from tempfile import TemporaryDirectory
+from git import Repo
 import pytest
 # Add source directory to path.
 # pylint: disable=duplicate-code
@@ -15,6 +17,20 @@ _src_path = Path(__file__).parent.parent / 'src'
 sys.path.insert(0, str(_src_path))
 # pylint: disable=wrong-import-position
 import git_helpers  # noqa: E402
+
+
+@pytest.fixture(autouse=True)
+def _no_autocrlf(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Disable core.autocrlf (default true in Git for Windows) for all git.
+
+    Git config from environment variables overrides system, global and
+    repository config, and is inherited by the git processes that both
+    these tests and GitPython start. With autocrlf=true, CRLF-only
+    working tree changes are not reported as changes at all.
+    """
+    monkeypatch.setenv('GIT_CONFIG_COUNT', '1')
+    monkeypatch.setenv('GIT_CONFIG_KEY_0', 'core.autocrlf')
+    monkeypatch.setenv('GIT_CONFIG_VALUE_0', 'false')
 
 
 def _run_git(args: list[str], repo_path: Path) -> str:
@@ -153,6 +169,27 @@ def test_unstaged_files_main_rel(monkeypatch: pytest.MonkeyPatch) -> \
         unstaged_all = git_helpers.get_unstaged_files(only_changed=False,
                                                       all_submodules=False)
         assert Path('new.txt') in unstaged_all
+
+
+def test_repos_closed(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Test _open_repos closes main and submodule repos on exit."""
+    closed: list[Path] = []
+    original_close = Repo.close
+
+    def _close(repo: Repo) -> None:
+        closed.append(Path(str(repo.working_tree_dir)).resolve())
+        original_close(repo)
+
+    monkeypatch.setattr(Repo, 'close', _close)
+    with TemporaryDirectory() as tmp_dir:
+        main_repo, _, _, _ = _create_repo_with_submodule(Path(tmp_dir))
+        monkeypatch.setattr(git_helpers, 'get_git_root', lambda *_,
+                            **__: main_repo)
+        with git_helpers._open_repos(all_submodules=True) as repos:
+            assert len(repos) == 2
+            assert not closed
+        assert set(closed) == {main_repo.resolve(),
+                               (main_repo / 'submod').resolve()}
 
 
 def test_unstaged_files_wr_rel(monkeypatch: pytest.MonkeyPatch) -> None:

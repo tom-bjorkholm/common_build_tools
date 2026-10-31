@@ -31,7 +31,8 @@ def run_py_launcher(args: list[str]) -> Optional[str]:
     if not shutil.which('py'):
         return None
     try:
-        process = subprocess.run(['py', *args], capture_output=True, text=True,
+        process = subprocess.run(['py', *args], capture_output=True,
+                                 encoding='utf-8', errors='replace',
                                  timeout=10, check=False)
     except subprocess.TimeoutExpired:
         return None
@@ -120,13 +121,26 @@ def _tee(cmd: list[str], sink: IO[str], cwd: Optional[Path] = None,
          env: Optional[dict[str, str]] = None) -> int:
     """Run command and write merged output to stdout and sink."""
     with subprocess.Popen(cmd, stdout=subprocess.PIPE,
-                          stderr=subprocess.STDOUT, text=True, cwd=cwd,
-                          env=env) as process:
+                          stderr=subprocess.STDOUT, encoding='utf-8',
+                          errors='replace', cwd=cwd,
+                          env=utf8_child_env(env)) as process:
         for line in (process.stdout or []):
             sys.stdout.write(line)
             sys.stdout.flush()
             sink.write(line)
     return process.returncode
+
+
+def utf8_child_env(env: Optional[dict[str, str]] = None) -> dict[str, str]:
+    """Return a copy of env (default os.environ) with UTF-8 Python stdio.
+
+    Python child processes then write UTF-8 to pipes on all platforms and
+    Python versions. (On Windows before Python 3.15 they would otherwise
+    use the ANSI code page, which differs from what newer versions use.)
+    """
+    environment = dict(os.environ if env is None else env)
+    environment['PYTHONIOENCODING'] = 'utf-8'
+    return environment
 
 
 def _print_error(returncode: int) -> None:

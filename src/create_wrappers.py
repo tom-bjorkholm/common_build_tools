@@ -4,8 +4,8 @@
 # Copyright (c) 2026 Tom Björkholm
 # MIT License
 
-import os
 from pathlib import Path
+from build_utils import is_windows
 from wrapper_file_list import WRAPPER_FILES
 
 
@@ -35,12 +35,12 @@ def _wrapper_content(target_script_name: str) -> str:
 def _write_wrapper_file(wrapper_path: Path, target_script_name: str) -> None:
     """Write one thin wrapper script to repository root."""
     wrapper_path.write_text(_wrapper_content(target_script_name),
-                            encoding='utf-8')
+                            encoding='utf-8', newline='\n')
 
 
 def _set_wrapper_permissions(wrapper_path: Path) -> None:
     """Set wrapper permissions to owner write + world read/execute."""
-    if os.name == 'nt':
+    if is_windows():
         return
     wrapper_path.chmod(0o755)
 
@@ -68,7 +68,7 @@ def _create_placeholder_python_file(custom_folder_path: Path,
     """Create a placeholder Python file in newly created custom folder."""
     placeholder_path = custom_folder_path / '__init__.py'
     placeholder_path.write_text(CUSTOM_FOLDER_PLACEHOLDER_CONTENT[folder_name],
-                                encoding='utf-8')
+                                encoding='utf-8', newline='\n')
 
 
 def create_custom_folder_structure(root_path: Path) -> None:
@@ -86,7 +86,7 @@ def create_custom_folder_structure(root_path: Path) -> None:
     custom_spec_path: Path = custom_build_tools_path / 'custom_spec.py'
     if not custom_spec_path.exists():
         custom_spec_path.write_text(CUSTOM_BUILD_TOOLS_SPEC_CONTENT,
-                                    encoding='utf-8')
+                                    encoding='utf-8', newline='\n')
 
 
 def create_wrappers() -> None:

@@ -4,6 +4,8 @@
 # Copyright (c) 2026 Tom Björkholm
 # MIT License
 
+from collections.abc import Iterator
+from contextlib import contextmanager
 from pathlib import Path
 import os
 import re
@@ -32,7 +34,8 @@ def _run_git_subprocess(repo_path: Path, args: list[str],
     environment = dict(os.environ)
     environment['GIT_TERMINAL_PROMPT'] = '0'
     return subprocess.run(['git', '-C', str(repo_path), *args],
-                          capture_output=True, text=True, check=False,
+                          capture_output=True, encoding='utf-8',
+                          errors='replace', check=False,
                           timeout=timeout_seconds, env=environment)
 
 
@@ -287,9 +290,22 @@ def _repo_root(repo: Repo) -> Path:
     return Path(root_text)
 
 
-def _get_main_repo() -> Repo:
-    """Get a Repo object for the main repository."""
-    return Repo(get_git_root())
+@contextmanager
+def _open_repos(all_submodules: bool) -> Iterator[list[Repo]]:
+    """Yield the main repo first, then submodule repos, and close all on exit.
+
+    Closing stops the persistent git processes that GitPython starts.
+    Without closing they live until garbage collection, and on Windows
+    their working directories lock the repository folders.
+    """
+    repos = [Repo(get_git_root())]
+    try:
+        if all_submodules:
+            repos.extend(_submodule_repos(repos[0]))
+        yield repos
+    finally:
+        for repo in repos:
+            repo.close()
 
 
 def _submodule_repos(main_repo: Repo) -> list[Repo]:
@@ -343,6 +359,33 @@ def _get_unstaged_repo_paths(repo: Repo,
     return unique_paths
 
 
+def _unstaged_wr(repos: list[Repo],
+                 only_changed: bool = True) -> list[tuple[Repo, Path]]:
+    """Get unstaged (repo, repo-relative path) pairs for all repos."""
+    return [(repo, file_path) for repo in repos for file_path in
+            _get_unstaged_repo_paths(repo, only_changed=only_changed)]
+
+
+def _main_relative_paths(main_repo: Repo,
+                         repo_files: list[tuple[Repo, Path]]) -> list[Path]:
+    """Convert (repo, repo-relative path) pairs to main-relative paths."""
+    return [_to_main_relative_path(main_repo, repo, file_path)
+            for repo, file_path in repo_files]
+
+
+def _has_only_eol_change(repo: Repo, file_path: Path) -> bool:
+    """Return True if the unstaged change of file_path is only line ends."""
+    diff_output = repo.git.diff('--ignore-cr-at-eol', '--ignore-space-at-eol',
+                                file_path.as_posix())
+    return not diff_output.strip()
+
+
+def _only_eol_wr(repos: list[Repo]) -> list[tuple[Repo, Path]]:
+    """Get unstaged (repo, path) pairs where only line endings changed."""
+    return [(repo, file_path) for repo, file_path in _unstaged_wr(repos)
+            if _has_only_eol_change(repo, file_path)]
+
+
 def get_unstaged_files_wr(only_changed: bool = True,
                           all_submodules: bool = True) -> \
                               list[tuple[Repo, Path]]:
@@ -362,22 +405,12 @@ def get_unstaged_files_wr(only_changed: bool = True,
     Returns:
         A list of tuples with repo objects and repo-relative file paths.
         Deleted files are not included.
+        The repo objects are already closed, which stops their background
+        git processes. They can still be used, but a caller that uses them
+        should call close() on them again afterwards.
     """
-    main_repo = _get_main_repo()
-    unstaged_files = [
-        (main_repo, file_path) for file_path in
-        _get_unstaged_repo_paths(main_repo, only_changed=only_changed)
-    ]
-    if not all_submodules:
-        return unstaged_files
-    for submodule_repo in _submodule_repos(main_repo):
-        unstaged_files.extend(
-            [
-                (submodule_repo, file_path) for file_path in
-                _get_unstaged_repo_paths(submodule_repo,
-                                         only_changed=only_changed)
-            ])
-    return unstaged_files
+    with _open_repos(all_submodules) as repos:
+        return _unstaged_wr(repos, only_changed=only_changed)
 
 
 def get_unstaged_files(only_changed: bool = True,
@@ -398,13 +431,9 @@ def get_unstaged_files(only_changed: bool = True,
         A list of main-repo-relative paths for unstaged files.
         Deleted files are not included.
     """
-    main_repo = _get_main_repo()
-    unstaged_files = get_unstaged_files_wr(only_changed=only_changed,
-                                           all_submodules=all_submodules)
-    return [
-        _to_main_relative_path(main_repo, repo, file_path)
-        for repo, file_path in unstaged_files
-    ]
+    with _open_repos(all_submodules) as repos:
+        return _main_relative_paths(
+            repos[0], _unstaged_wr(repos, only_changed=only_changed))
 
 
 def get_only_line_end_changes(all_submodules: bool = True) -> list[Path]:
@@ -419,17 +448,8 @@ def get_only_line_end_changes(all_submodules: bool = True) -> list[Path]:
     Returns:
         A list of main-repo-relative paths where only line ending changed.
     """
-    only_eol_changes: list[Path] = []
-    main_repo = _get_main_repo()
-    unstaged_files = get_unstaged_files_wr(all_submodules=all_submodules)
-    for repo, file_path in unstaged_files:
-        diff_output = repo.git.diff('--ignore-cr-at-eol',
-                                    '--ignore-space-at-eol',
-                                    file_path.as_posix())
-        if not diff_output.strip():
-            only_eol_changes.append(
-                _to_main_relative_path(main_repo, repo, file_path))
-    return only_eol_changes
+    with _open_repos(all_submodules) as repos:
+        return _main_relative_paths(repos[0], _only_eol_wr(repos))
 
 
 def _matches_allowed_patterns(path: Path, allowed_patterns: list[str]) -> bool:
@@ -446,36 +466,17 @@ def _tracked_files_for_repo(repo: Repo) -> list[Path]:
     return [Path(line) for line in file_text.splitlines()]
 
 
-def _candidate_files_for_restore(main_repo: Repo, all_submodules: bool,
-                                 force_unix: bool) -> \
-                                     list[tuple[Repo, Path, Path]]:
-    """Collect candidate files for restore operation."""
+def _restore_candidates(repos: list[Repo], force_unix: bool) -> \
+        list[tuple[Path, Path]]:
+    """Collect (full path, main-repo-relative path) of restore candidates."""
     if force_unix:
-        candidate_files: list[tuple[Repo, Path, Path]] = []
-        repos = [main_repo]
-        if all_submodules:
-            repos.extend(_submodule_repos(main_repo))
-        for repo in repos:
-            repo_files = _tracked_files_for_repo(repo)
-            for repo_path in repo_files:
-                main_rel_path = _to_main_relative_path(main_repo, repo,
-                                                       repo_path)
-                candidate_files.append((repo, repo_path, main_rel_path))
-        return candidate_files
-    main_rel_only_eol = get_only_line_end_changes(all_submodules)
-    unstaged_wr = get_unstaged_files_wr(all_submodules=all_submodules)
-    unstaged_by_main_rel = {
-        _to_main_relative_path(main_repo, repo, repo_path): (repo, repo_path)
-        for repo, repo_path in unstaged_wr
-    }
-    candidate_files = []
-    for main_rel_path in main_rel_only_eol:
-        repo_file = unstaged_by_main_rel.get(main_rel_path)
-        if repo_file is None:
-            continue
-        repo, repo_path = repo_file
-        candidate_files.append((repo, repo_path, main_rel_path))
-    return candidate_files
+        repo_files = [(repo, file_path) for repo in repos
+                      for file_path in _tracked_files_for_repo(repo)]
+    else:
+        repo_files = _only_eol_wr(repos)
+    return [(_repo_root(repo) / file_path,
+             _to_main_relative_path(repos[0], repo, file_path))
+            for repo, file_path in repo_files]
 
 
 def restore_bad_eol_changes(all_submodules: bool = True,
@@ -510,12 +511,11 @@ def restore_bad_eol_changes(all_submodules: bool = True,
     """
     patterns = list(EOL_ALLOWED_PATTERNS if allowed_patterns is None
                     else allowed_patterns)
-    main_repo = _get_main_repo()
-    candidate_files = _candidate_files_for_restore(
-        main_repo, all_submodules=all_submodules, force_unix=force_unix)
+    with _open_repos(all_submodules) as repos:
+        candidate_files = _restore_candidates(repos, force_unix)
     seen_paths: set[Path] = set()
     restored_files: list[Path] = []
-    for repo, repo_rel_path, main_rel_path in candidate_files:
+    for full_path, main_rel_path in candidate_files:
         if main_rel_path in seen_paths:
             continue
         seen_paths.add(main_rel_path)
@@ -524,7 +524,6 @@ def restore_bad_eol_changes(all_submodules: bool = True,
                 print(f'Not allowed to convert path: {main_rel_path}',
                       file=sys.stderr)
             continue
-        full_path = _repo_root(repo) / repo_rel_path
         if not full_path.is_file():
             continue
         dos2unix(full_path)

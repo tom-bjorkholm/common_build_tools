@@ -281,7 +281,7 @@ def _replace_test_summary_in_readme(readme_path: Path,
             summary_start = index
             break
     summary_text = summary_path.read_text(encoding='utf-8')
-    with open(readme_path, 'w', encoding='utf-8') as file_obj:
+    with open(readme_path, 'w', encoding='utf-8', newline='\n') as file_obj:
         file_obj.writelines(lines[:summary_start])
         file_obj.write(summary_text)
 
@@ -301,7 +301,8 @@ def _update_readmes(build_information: BuildInformation, summary_file: Path) \
 def _get_python_version(venv_cmd: list[str], project_root: Path) -> str:
     """Return version text from virtual environment Python executable."""
     process = subprocess.run([*venv_cmd, '--version'], capture_output=True,
-                             text=True, check=False, cwd=project_root)
+                             encoding='utf-8', errors='replace', check=False,
+                             cwd=project_root)
     version_text = process.stdout.strip()
     if version_text:
         return version_text
