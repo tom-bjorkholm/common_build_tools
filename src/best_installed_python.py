@@ -18,14 +18,20 @@ from build_utils import (
 
 
 def _find_via_py_launcher() -> list[tuple[int, int]]:
-    """Discover Python 3.x versions via the Windows py launcher."""
+    """Discover Python 3.x versions via the Windows py launcher.
+
+    Both the current `py --list` format (` -V:3.15 *  Python 3.15`) and
+    the pre-3.11 launcher format (` -3.14-64`) are recognized. Free-threaded
+    entries (`-V:3.13t`) and other tags are skipped, as `py -3.X` does not
+    select them.
+    """
     listing = run_py_launcher(['--list'])
     if listing is None:
         return []
     results: list[tuple[int, int]] = []
     seen: set[tuple[int, int]] = set()
     for line in listing.splitlines():
-        match = re.search(r'-(\d+)\.(\d+)', line)
+        match = re.search(r'-(?:V:)?(\d+)\.(\d+)(?=[\s*-]|$)', line)
         if not match:
             continue
         major = int(match.group(1))

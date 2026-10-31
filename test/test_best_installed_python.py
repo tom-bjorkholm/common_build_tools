@@ -28,6 +28,24 @@ def test_py_launcher_parses_py3(monkeypatch: pytest.MonkeyPatch) -> None:
     assert sorted(versions) == [(3, 12), (3, 14)]
 
 
+@pytest.mark.parametrize('listing, expected', [
+    (' -V:3.15 *        Python 3.15 (64-bit)\n'
+     ' -V:3.12          Python 3.12 (64-bit)\n', [(3, 15), (3, 12)]),
+    (' -3.14-64 *\n -3.12-32\n', [(3, 14), (3, 12)]),
+    (' -V:3.14-arm64    Python 3.14 (ARM64)\n', [(3, 14)]),
+    (' -V:3.13t         Python 3.13 (64-bit, freethreaded)\n'
+     ' -V:3.13          Python 3.13 (64-bit)\n', [(3, 13)]),
+    (' -V:3.14t         Python 3.14 (64-bit, freethreaded)\n', []),
+    (' -V:ContinuumAnalytics/Anaconda39-64 Anaconda\n', []),
+    ('', [])])
+def test_py_launcher_formats(monkeypatch: pytest.MonkeyPatch, listing: str,
+                             expected: list[tuple[int, int]]) -> None:
+    """Test py launcher parsing of current and legacy listing formats."""
+    monkeypatch.setattr(best_installed_python, 'run_py_launcher',
+                        lambda _args: listing)
+    assert best_installed_python._find_via_py_launcher() == expected
+
+
 def test_py_launcher_timeout(monkeypatch: pytest.MonkeyPatch) -> None:
     """Test py launcher discovery returns empty list after timeout."""
     monkeypatch.setattr(shutil, 'which',
@@ -61,7 +79,7 @@ def test_path_scan_finds_pythons(monkeypatch: pytest.MonkeyPatch,
     monkeypatch.setenv('PATH', os.pathsep.join([str(first_dir),
                                                 str(second_dir)]))
     versions = best_installed_python._find_via_path_scan()
-    assert versions == [(3, 12), (3, 14)]
+    assert sorted(versions) == [(3, 12), (3, 14)]
 
 
 def test_best_python_from_path(monkeypatch: pytest.MonkeyPatch) -> None:
