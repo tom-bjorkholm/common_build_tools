@@ -171,13 +171,22 @@ def test_unstaged_files_main_rel(monkeypatch: pytest.MonkeyPatch) -> \
         assert Path('new.txt') in unstaged_all
 
 
+def _closed_of(repos: list[Repo], closed: list[Repo]) -> list[bool]:
+    """Return whether each of the repos is among the closed ones."""
+    return [any(repo is done for done in closed) for repo in repos]
+
+
 def test_repos_closed(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Test _open_repos closes main and submodule repos on exit."""
-    closed: list[Path] = []
+    """Test _open_repos closes main and submodule repos on exit.
+
+    The garbage collector may meanwhile close Repo objects left over
+    from other tests, so only the repos that are yielded are checked.
+    """
+    closed: list[Repo] = []
     original_close = Repo.close
 
     def _close(repo: Repo) -> None:
-        closed.append(Path(str(repo.working_tree_dir)).resolve())
+        closed.append(repo)
         original_close(repo)
 
     monkeypatch.setattr(Repo, 'close', _close)
@@ -186,10 +195,11 @@ def test_repos_closed(monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setattr(git_helpers, 'get_git_root', lambda *_,
                             **__: main_repo)
         with git_helpers._open_repos(all_submodules=True) as repos:
-            assert len(repos) == 2
-            assert not closed
-        assert set(closed) == {main_repo.resolve(),
-                               (main_repo / 'submod').resolve()}
+            assert [Path(str(repo.working_tree_dir)).resolve()
+                    for repo in repos] == [main_repo.resolve(),
+                                           (main_repo / 'submod').resolve()]
+            assert _closed_of(repos, closed) == [False, False]
+        assert _closed_of(repos, closed) == [True, True]
 
 
 def test_unstaged_files_wr_rel(monkeypatch: pytest.MonkeyPatch) -> None:
