@@ -274,6 +274,9 @@ The "testing" includes flake8, mypy, pylint, python-layout and pytest.
 A coverage report is created when running the build and tests.
 The build system creates the file `./reports/coverage_config.ini`
 with names of the detected packages that will be tested `./venv`.
+Branch coverage is enabled, and `@overload` stubs are excluded from the
+report (they never run, and multi-line stubs would otherwise show up as
+partial branches).
 
 #### python-layout
 

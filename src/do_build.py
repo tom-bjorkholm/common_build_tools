@@ -238,13 +238,16 @@ def _write_cov_config(build_information: BuildInformation,
     under ``source_pkgs`` makes coverage resolve them as importable
     packages regardless of same-named folders. Returns None when no
     packages were discovered, which leaves coverage disabled.
+    ``@overload`` stubs are excluded: they never run, and a signature
+    spanning several lines otherwise shows up as a partial branch.
     """
     packages = build_information['package_information']
     names = [data['normalized_name'] for data in packages]
     if not names:
         return None
     lines = (['[run]', 'branch = True', 'source_pkgs ='] +
-             [f'    {name}' for name in names])
+             [f'    {name}' for name in names] +
+             ['', '[report]', 'exclude_also =', r'    @(typing\.)?overload'])
     config_path = report_dir / 'coverage_config.ini'
     config_path.write_text('\n'.join(lines) + '\n', encoding='utf-8')
     return config_path
